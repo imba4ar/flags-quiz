@@ -1,0 +1,2345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Флаги и столицы мира</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Морская карта: глубина воды, отмели у берега и сетка меридианов */
+            background:
+                repeating-linear-gradient(0deg, rgba(13, 74, 94, 0.05) 0 1px, transparent 1px 56px),
+                repeating-linear-gradient(90deg, rgba(13, 74, 94, 0.05) 0 1px, transparent 1px 56px),
+                radial-gradient(ellipse at 20% 0%, #e8f4f2 0%, transparent 55%),
+                linear-gradient(150deg, #dcefec 0%, #cfe3e0 45%, #c3d9d8 100%);
+            padding: 6px;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            height: 100%;
+            margin: 0 auto;
+            background: rgba(253, 251, 245, 0.82);
+            backdrop-filter: blur(8px);
+            border-radius: 28px;
+            padding: 8px 12px;
+            box-shadow: 0 25px 50px -10px rgba(9, 50, 61, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .top-bar {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 210px;
+            flex-shrink: 0;
+            margin-bottom: 4px;
+            gap: 10px;
+        }
+
+        .left-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 1;
+            align-items: flex-start;
+            /* не заезжать на флаг, который центрирован абсолютно */
+            max-width: calc(50% - 180px);
+        }
+
+        /* Кейкапы клавиш приклеены к самим кнопкам справа — подсказка живёт в одном месте. */
+        .right-actions button[data-key] {
+            position: relative;
+            padding-right: 74px;
+        }
+        .right-actions button[data-key]::after {
+            content: attr(data-key);
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(15, 23, 42, 0.82);
+            color: #fff;
+            border-radius: 7px;
+            padding: 1px 7px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            line-height: 1.6;
+            box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.25);
+            pointer-events: none;
+        }
+        .right-actions button[data-key].secondary::after {
+            background: rgba(15, 23, 42, 0.75);
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.65);
+            padding: 4px 8px;
+            border-radius: 40px;
+            border: 1px solid rgba(197, 168, 110, 0.35);
+            box-shadow: 0 3px 10px rgba(9, 50, 61, 0.06);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .mode-selector button {
+            border: none;
+            background: transparent;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #64748b;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .mode-selector button.active {
+            background: #0b4a5c;
+            color: white;
+        }
+        .mode-selector button:hover:not(.active) {
+            background: #dbeae7;
+        }
+        .mode-selector button#speedModeBtn {
+            background: linear-gradient(135deg, #0e7a68, #14957d);
+            color: #fff;
+            box-shadow: 0 3px 10px rgba(14, 122, 104, 0.35);
+        }
+        .mode-selector button#speedModeBtn:hover {
+            background: linear-gradient(135deg, #0c6657, #10806c);
+        }
+        .mode-selector button#speedModeBtn.active {
+            background: linear-gradient(135deg, #0c6657, #10806c);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
+        }
+        .mode-selector .divider {
+            width: 1px;
+            height: 24px;
+            background: #cbd5e1;
+            margin: 0 4px;
+        }
+        .mode-selector .toggle-flags {
+            background: #e2e8f0;
+            color: #1e293b;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            border: none;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .mode-selector .toggle-flags.active {
+            background: #1e293b;
+            color: white;
+        }
+        /* Режим включён, но сейчас перекрыт другим: показан не он, а вернётся при выключении верхнего. */
+        .mode-selector .toggle-flags.armed {
+            box-shadow: inset 0 0 0 2px #1e293b;
+            color: #1e293b;
+        }
+        .mode-selector .toggle-flags:hover {
+            opacity: 0.8;
+        }
+
+        .flag-area {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .flag-area img, .flag-area canvas {
+            width: 320px;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+            border: 2px solid white;
+            background: #f1f5f9;
+            display: block;
+            pointer-events: auto;
+        }
+        .flag-area canvas {
+            width: 200px;
+        }
+        /* Диаграмма цветов — круг на прозрачном фоне: рамка и подложка флага ей не нужны. */
+        .flag-area canvas.pie {
+            border: none;
+            background: transparent;
+            box-shadow: none;
+        }
+        .flag-area span {
+            pointer-events: none;
+        }
+
+        .right-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+            z-index: 1;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .right-actions button {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: #fdfbf5;
+            box-shadow: 0 4px 10px rgba(9, 50, 61, 0.08);
+            transition: 0.15s;
+            cursor: pointer;
+            color: #123a45;
+            border: 1px solid rgba(197, 168, 110, 0.35);
+            height: 38px;
+            white-space: nowrap;
+        }
+        .right-actions button.primary {
+            background: #0b4a5c;
+            color: #efe9d8;
+            border: none;
+        }
+        .right-actions button.primary:hover {
+            background: #083644;
+        }
+        .right-actions button.secondary {
+            background: #e9b949;
+            border: none;
+            color: #3c2f0d;
+        }
+        .right-actions button.secondary:hover {
+            background: #d9a832;
+        }
+        .right-actions button.danger {
+            background: #c4593c;
+            border: none;
+            color: #fff;
+        }
+        .right-actions button.danger:hover {
+            background: #ad4a30;
+        }
+        .right-actions button.success {
+            background: #4c9a58;
+            border: none;
+            color: #fff;
+        }
+        .right-actions button.success:hover {
+            background: #3d8449;
+        }
+        .right-actions button.hidden {
+            display: none;
+        }
+
+        .result-box {
+            margin: 4px 0 2px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: #fdfbf5;
+            border: 1px solid rgba(197, 168, 110, 0.35);
+            text-align: center;
+            box-shadow: 0 6px 16px rgba(9, 50, 61, 0.06);
+            display: none;
+            flex-shrink: 0;
+        }
+        .result-box.show {
+            display: block;
+        }
+        .result-box.correct {
+            background: #e5f4e0;
+            border: 2px solid #4c9a58;
+        }
+        .result-box.wrong {
+            background: #fbe7e0;
+            border: 2px solid #c4593c;
+        }
+        .result-box.skip {
+            background: #eef2ef;
+            border: 2px solid #7d938f;
+        }
+        .result-box.dontknow {
+            background: #fbf3d9;
+            border: 2px solid #c9a13e;
+        }
+        .result-box .msg {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 0;
+        }
+        .result-box .details {
+            font-size: 1rem;
+            color: #1e293b;
+        }
+        .result-box .details strong {
+            color: #0f172a;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 5px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 2px 6px 2px;
+            align-content: start;
+        }
+
+        .options-grid button {
+            height: 50px;
+            font-size: 1rem;
+            padding: 2px 4px;
+            border-radius: 10px;
+            background: #fdfbf5;
+            border: 2px solid rgba(197, 168, 110, 0.22);
+            box-shadow: 0 3px 8px rgba(9, 50, 61, 0.05);
+            transition: all 0.1s ease;
+            cursor: pointer;
+            color: #123a45;
+            font-weight: 500;
+            text-align: center;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .options-grid button:hover {
+            transform: scale(1.02);
+            border-color: #0e7a68;
+            box-shadow: 0 4px 12px rgba(14, 122, 104, 0.22);
+        }
+        .options-grid button:active {
+            transform: scale(0.97);
+        }
+
+        .options-grid button.flag-mode {
+            color: white;
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.9),
+                         0 0 2px rgba(0, 0, 0, 0.9);
+            font-weight: 700;
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        .options-grid button.flag-mode:hover {
+            border-color: white;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Забег на время: страна уже отгадана в этом забеге и в списке нужна только как помеха. */
+        .options-grid button.done {
+            position: relative;
+            opacity: 0.55;
+        }
+        .options-grid button.done::after {
+            content: '✓';
+            position: absolute;
+            top: 1px;
+            right: 4px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #16a34a;
+            text-shadow: 0 0 3px white, 0 0 3px white;
+        }
+
+        .options-grid::-webkit-scrollbar {
+            width: 5px;
+        }
+        .options-grid::-webkit-scrollbar-track {
+            background: #dcebe8;
+            border-radius: 8px;
+        }
+        .options-grid::-webkit-scrollbar-thumb {
+            background: #9dbcb6;
+            border-radius: 8px;
+        }
+
+        /* ===== HUD режима "На время" ===== */
+        .hud {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            margin: 2px 0 6px;
+        }
+        .hud.show {
+            display: flex;
+        }
+        .hud .pill {
+            background: rgba(253, 251, 245, 0.9);
+            border: 1px solid rgba(197, 168, 110, 0.35);
+            border-radius: 40px;
+            padding: 5px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #123a45;
+            box-shadow: 0 3px 8px rgba(9, 50, 61, 0.06);
+            white-space: nowrap;
+        }
+        .hud .pill.timer {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            font-size: 1rem;
+            background: #0b4a5c;
+            border-color: #0b4a5c;
+            color: #efe9d8;
+        }
+        .hud .pill .warn {
+            color: #eab308;
+        }
+        .hud .spacer {
+            flex: 1;
+        }
+        .hud button {
+            border: none;
+            border-radius: 40px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: #0b4a5c;
+            color: #efe9d8;
+            height: 32px;
+            white-space: nowrap;
+        }
+        .hud button:hover {
+            opacity: 0.85;
+        }
+
+        .options-grid button.hit {
+            background: #e5f4e0 !important;
+            border-color: #4c9a58 !important;
+        }
+        .options-grid button.miss {
+            background: #fbe7e0 !important;
+            border-color: #c4593c !important;
+        }
+
+        /* ===== Оверлей с итогами ===== */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 50, 61, 0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .overlay.show {
+            display: flex;
+        }
+        .overlay-card {
+            background: #fdfbf5;
+            border: 1px solid rgba(197, 168, 110, 0.4);
+            border-radius: 24px;
+            padding: 28px 30px;
+            max-width: 620px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 60px rgba(9, 50, 61, 0.35);
+            text-align: center;
+        }
+        .overlay-card h2 {
+            font-size: 1.6rem;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        .overlay-card .big-time {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #1e293b;
+            font-variant-numeric: tabular-nums;
+            margin: 8px 0 4px;
+        }
+        .overlay-card .sub {
+            color: #475569;
+            font-size: 1rem;
+            margin-bottom: 18px;
+        }
+        .overlay-card .rounds {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .overlay-card .round-block {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+        }
+        .overlay-card .round-block .round-title {
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .overlay-card .round-block .round-title .round-err {
+            color: #ef4444;
+            font-weight: 600;
+        }
+        .overlay-card .round-block .round-countries {
+            font-size: 0.85rem;
+            color: #475569;
+            line-height: 1.5;
+        }
+        .overlay-card .round-block .round-flags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+        .overlay-card .round-block .flag-ico {
+            width: 30px;
+            height: 20px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            cursor: help;
+        }
+        .overlay-card .overlay-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .overlay-card .overlay-actions button {
+            border: none;
+            border-radius: 40px;
+            padding: 10px 22px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .overlay-card .overlay-actions .again {
+            background: #1e293b;
+            color: white;
+        }
+        .overlay-card .overlay-actions .again:hover {
+            background: #0f172a;
+        }
+        .overlay-card .overlay-actions .exit {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        .overlay-card .overlay-actions .exit:hover {
+            background: #e2e8f0;
+        }
+
+        /* ===== История забегов ===== */
+        .overlay-card h3.history-title {
+            text-align: left;
+            font-size: 1.1rem;
+            color: #0f172a;
+            margin: 20px 0 10px;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .history-table th {
+            padding: 6px 8px;
+            color: #64748b;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .history-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #1e293b;
+            font-variant-numeric: tabular-nums;
+        }
+        .history-table td.num {
+            text-align: right;
+        }
+        .history-table .del-btn {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 0.9rem;
+            opacity: 0.55;
+            transition: 0.15s;
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+        .history-table .del-btn:hover {
+            opacity: 1;
+            background: #fee2e2;
+        }
+        .history-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        .history-actions button {
+            border: none;
+            border-radius: 30px;
+            padding: 5px 14px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        .history-actions button:hover {
+            background: #e2e8f0;
+        }
+
+        /* ===== Таблица времени по странам ===== */
+        .ctable {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+            margin-top: 6px;
+        }
+        .ctable td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .ctable td.t {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+        }
+        .ctable td.t.ok { color: #16a34a; }
+        .ctable td.t.fail { color: #ef4444; }
+        .ctable .flag-ico {
+            width: 26px;
+            height: 17px;
+            object-fit: cover;
+            border-radius: 3px;
+            border: 1px solid #e2e8f0;
+            vertical-align: middle;
+            margin-right: 7px;
+        }
+        .ctable-title {
+            text-align: left;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 18px 0 2px;
+        }
+
+        @media (max-width: 1000px) {
+            .flag-area img {
+                width: 220px;
+            }
+            .flag-area canvas {
+                width: 150px;
+            }
+            .top-bar {
+                min-height: 150px;
+            }
+            .options-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+                gap: 4px;
+            }
+            .options-grid button {
+                height: 40px;
+                font-size: 0.8rem;
+            }
+            .right-actions button {
+                font-size: 0.75rem;
+                padding: 4px 10px;
+                height: 32px;
+            }
+            .right-actions button[data-key] {
+                padding-right: 56px;
+            }
+            .right-actions button[data-key]::after {
+                right: 6px;
+                font-size: 0.55rem;
+                padding: 0 5px;
+            }
+            .left-section {
+                flex-direction: row;
+                align-items: center;
+                flex-wrap: wrap;
+                max-width: calc(50% - 130px);
+            }
+            .mode-selector button {
+                font-size: 0.7rem;
+                padding: 2px 8px;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .top-bar {
+                flex-wrap: wrap;
+                justify-content: center;
+                min-height: auto;
+                padding-bottom: 10px;
+            }
+            .left-section {
+                order: 2;
+                width: 100%;
+                max-width: 100%;
+                justify-content: center;
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            .flag-area {
+                position: relative;
+                left: auto;
+                top: auto;
+                transform: none;
+                order: 1;
+                width: 100%;
+                margin-bottom: 6px;
+            }
+            .flag-area img {
+                width: 160px;
+            }
+            .flag-area canvas {
+                width: 120px;
+            }
+            .right-actions {
+                order: 3;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <div class="left-section">
+                <div class="mode-selector">
+                    <button id="speedModeBtn">⏱ На время</button>
+                    <span class="divider"></span>
+                    <button id="toggleFlags" class="toggle-flags">🏳️ Флаги</button>
+                    <button id="toggleZoom" class="toggle-flags" title="Показывать только фрагмент флага">🔍 Zoom</button>
+                    <button id="togglePie" class="toggle-flags" title="Показывать только доли цветов флага">🥧 Цвета</button>
+                </div>
+            </div>
+
+            <div class="flag-area">
+                <img id="flagImage" src="" alt="Флаг" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                <span style="display:none; color:#94a3b8; font-size:0.8rem;">нет флага</span>
+                <canvas id="flagZoom" style="display:none"></canvas>
+            </div>
+
+            <div class="right-actions">
+                <button class="danger hidden" id="btnDontKnow" data-key="Пробел">❌ Не знаю</button>
+                <button class="secondary hidden" id="btnKnow" data-key="Enter">👍 Знаю</button>
+                <button class="danger hidden" id="btnMistake" data-key="Пробел">😬 Я ошибся</button>
+                <button class="primary hidden" id="btnNext" data-key="Enter">➡️ Далее</button>
+            </div>
+        </div>
+
+        <div class="result-box" id="resultBox">
+            <div class="msg" id="resultMsg">Правильно!</div>
+            <div class="details" id="resultDetails">Страна: <strong>Россия</strong>, Столица: <strong>Москва</strong></div>
+        </div>
+
+        <div class="hud" id="hud">
+            <div class="pill timer">⏱ <span id="hudTimer">0:00.0</span></div>
+            <div class="pill">Круг <span id="hudRound">1</span></div>
+            <div class="pill">В круге: <span id="hudInRound">0</span></div>
+            <div class="pill">В следующий: <span id="hudCarry">0</span></div>
+            <div class="pill">Ошибки: <span id="hudErrors">0</span></div>
+            <div class="spacer"></div>
+            <button id="speedExit">⏹ Завершить</button>
+        </div>
+
+        <div class="overlay" id="resultsOverlay">
+            <div class="overlay-card">
+                <h2>🏁 Готово!</h2>
+                <div class="big-time" id="finalTime">0:00.0</div>
+                <div class="sub" id="finalSub"></div>
+            <div class="rounds" id="finalRounds"></div>
+                <div class="overlay-actions">
+                    <button class="again" id="speedAgain">🔁 Заново</button>
+                    <button class="exit" id="speedClose">Вернуться в обычный режим</button>
+                </div>
+
+                <h3 class="history-title">📜 История забегов</h3>
+                <div id="historyWrap"></div>
+                <div class="history-actions">
+                    <button id="historyExport">⬇️ Выгрузить JSON</button>
+                    <button id="historyClear">🗑 Очистить всё</button>
+                </div>
+            </div>
+        </div>
+        <div class="options-grid" id="optionsContainer"></div>
+    </div>
+
+    <script>
+        // --------------------------------------------------------------
+        // 1. ДАННЫЕ (полный список стран)
+        // --------------------------------------------------------------
+        const COUNTRIES_DATA = [
+            { name: "Австралия", capital: "Канберра", code: "au" },
+            { name: "Австрия", capital: "Вена", code: "at" },
+            { name: "Азербайджан", capital: "Баку", code: "az" },
+            { name: "Албания", capital: "Тирана", code: "al" },
+            { name: "Алжир", capital: "Алжир", code: "dz" },
+            { name: "Ангола", capital: "Луанда", code: "ao" },
+            { name: "Андорра", capital: "Андорра-ла-Велья", code: "ad" },
+            { name: "Антигуа и Барбуда", capital: "Сент-Джонс", code: "ag" },
+            { name: "Аргентина", capital: "Буэнос-Айрес", code: "ar" },
+            { name: "Армения", capital: "Ереван", code: "am" },
+            { name: "Афганистан", capital: "Кабул", code: "af" },
+            { name: "Багамские Острова", capital: "Нассау", code: "bs" },
+            { name: "Бангладеш", capital: "Дакка", code: "bd" },
+            { name: "Барбадос", capital: "Бриджтаун", code: "bb" },
+            { name: "Бахрейн", capital: "Манама", code: "bh" },
+            { name: "Беларусь", capital: "Минск", code: "by" },
+            { name: "Белиз", capital: "Бельмопан", code: "bz" },
+            { name: "Бельгия", capital: "Брюссель", code: "be" },
+            { name: "Бенин", capital: "Порто-Ново", code: "bj" },
+            { name: "Болгария", capital: "София", code: "bg" },
+            { name: "Боливия", capital: "Сукре", code: "bo" },
+            { name: "Босния и Герцеговина", capital: "Сараево", code: "ba" },
+            { name: "Ботсвана", capital: "Габороне", code: "bw" },
+            { name: "Бразилия", capital: "Бразилиа", code: "br" },
+            { name: "Бруней", capital: "Бандар-Сери-Бегаван", code: "bn" },
+            { name: "Буркина-Фасо", capital: "Уагадугу", code: "bf" },
+            { name: "Бурунди", capital: "Бужумбура", code: "bi" },
+            { name: "Бутан", capital: "Тхимпху", code: "bt" },
+            { name: "Вануату", capital: "Порт-Вила", code: "vu" },
+            { name: "Ватикан", capital: "Ватикан", code: "va" },
+            { name: "Великобритания", capital: "Лондон", code: "gb" },
+            { name: "Венгрия", capital: "Будапешт", code: "hu" },
+            { name: "Венесуэла", capital: "Каракас", code: "ve" },
+            { name: "Восточный Тимор", capital: "Дили", code: "tl" },
+            { name: "Вьетнам", capital: "Ханой", code: "vn" },
+            { name: "Габон", capital: "Либревиль", code: "ga" },
+            { name: "Гаити", capital: "Порт-о-Пренс", code: "ht" },
+            { name: "Гайана", capital: "Джорджтаун", code: "gy" },
+            { name: "Гамбия", capital: "Банджул", code: "gm" },
+            { name: "Гана", capital: "Аккра", code: "gh" },
+            { name: "Гватемала", capital: "Гватемала", code: "gt" },
+            { name: "Гвинея", capital: "Конакри", code: "gn" },
+            { name: "Гвинея-Бисау", capital: "Бисау", code: "gw" },
+            { name: "Германия", capital: "Берлин", code: "de" },
+            { name: "Гондурас", capital: "Тегусигальпа", code: "hn" },
+            { name: "Гренада", capital: "Сент-Джорджес", code: "gd" },
+            { name: "Греция", capital: "Афины", code: "gr" },
+            { name: "Грузия", capital: "Тбилиси", code: "ge" },
+            { name: "Дания", capital: "Копенгаген", code: "dk" },
+            { name: "Джибути", capital: "Джибути", code: "dj" },
+            { name: "Доминика", capital: "Розо", code: "dm" },
+            { name: "Доминиканская Республика", capital: "Санто-Доминго", code: "do" },
+            { name: "Египет", capital: "Каир", code: "eg" },
+            { name: "Замбия", capital: "Лусака", code: "zm" },
+            { name: "Зимбабве", capital: "Хараре", code: "zw" },
+            { name: "Израиль", capital: "Иерусалим", code: "il" },
+            { name: "Индия", capital: "Нью-Дели", code: "in" },
+            { name: "Индонезия", capital: "Джакарта", code: "id" },
+            { name: "Иордания", capital: "Амман", code: "jo" },
+            { name: "Ирак", capital: "Багдад", code: "iq" },
+            { name: "Иран", capital: "Тегеран", code: "ir" },
+            { name: "Ирландия", capital: "Дублин", code: "ie" },
+            { name: "Исландия", capital: "Рейкьявик", code: "is" },
+            { name: "Испания", capital: "Мадрид", code: "es" },
+            { name: "Италия", capital: "Рим", code: "it" },
+            { name: "Йемен", capital: "Сана", code: "ye" },
+            { name: "Кабо-Верде", capital: "Прая", code: "cv" },
+            { name: "Казахстан", capital: "Астана", code: "kz" },
+            { name: "Камбоджа", capital: "Пномпень", code: "kh" },
+            { name: "Камерун", capital: "Яунде", code: "cm" },
+            { name: "Канада", capital: "Оттава", code: "ca" },
+            { name: "Катар", capital: "Доха", code: "qa" },
+            { name: "Кения", capital: "Найроби", code: "ke" },
+            { name: "Кипр", capital: "Никосия", code: "cy" },
+            { name: "Киргизия", capital: "Бишкек", code: "kg" },
+            { name: "Кирибати", capital: "Южная Тарава", code: "ki" },
+            { name: "Китай", capital: "Пекин", code: "cn" },
+            { name: "Колумбия", capital: "Богота", code: "co" },
+            { name: "Коморские Острова", capital: "Морони", code: "km" },
+            { name: "Республика Конго", capital: "Браззавиль", code: "cg" },
+            { name: "ДР Конго", capital: "Киншаса", code: "cd" },
+            { name: "Корея (Южная)", capital: "Сеул", code: "kr" },
+            { name: "Коста-Рика", capital: "Сан-Хосе", code: "cr" },
+            { name: "Кот-д’Ивуар", capital: "Ямусукро", code: "ci" },
+            { name: "Куба", capital: "Гавана", code: "cu" },
+            { name: "Кувейт", capital: "Эль-Кувейт", code: "kw" },
+            { name: "Лаос", capital: "Вьентьян", code: "la" },
+            { name: "Латвия", capital: "Рига", code: "lv" },
+            { name: "Лесото", capital: "Масеру", code: "ls" },
+            { name: "Либерия", capital: "Монровия", code: "lr" },
+            { name: "Ливан", capital: "Бейрут", code: "lb" },
+            { name: "Ливия", capital: "Триполи", code: "ly" },
+            { name: "Литва", capital: "Вильнюс", code: "lt" },
+            { name: "Лихтенштейн", capital: "Вадуц", code: "li" },
+            { name: "Люксембург", capital: "Люксембург", code: "lu" },
+            { name: "Маврикий", capital: "Порт-Луи", code: "mu" },
+            { name: "Мавритания", capital: "Нуакшот", code: "mr" },
+            { name: "Мадагаскар", capital: "Антананариву", code: "mg" },
+            { name: "Малави", capital: "Лилонгве", code: "mw" },
+            { name: "Малайзия", capital: "Куала-Лумпур", code: "my" },
+            { name: "Мали", capital: "Бамако", code: "ml" },
+            { name: "Мальдивы", capital: "Мале", code: "mv" },
+            { name: "Мальта", capital: "Валлетта", code: "mt" },
+            { name: "Марокко", capital: "Рабат", code: "ma" },
+            { name: "Маршалловы Острова", capital: "Маджуро", code: "mh" },
+            { name: "Мексика", capital: "Мехико", code: "mx" },
+            { name: "Микронезия", capital: "Паликир", code: "fm" },
+            { name: "Мозамбик", capital: "Мапуту", code: "mz" },
+            { name: "Молдова", capital: "Кишинёв", code: "md" },
+            { name: "Монако", capital: "Монако", code: "mc" },
+            { name: "Монголия", capital: "Улан-Батор", code: "mn" },
+            { name: "Мьянма", capital: "Нейпьидо", code: "mm" },
+            { name: "Намибия", capital: "Виндхук", code: "na" },
+            { name: "Науру", capital: "Ярен", code: "nr" },
+            { name: "Непал", capital: "Катманду", code: "np" },
+            { name: "Нигер", capital: "Ниамей", code: "ne" },
+            { name: "Нигерия", capital: "Абуджа", code: "ng" },
+            { name: "Нидерланды", capital: "Амстердам", code: "nl" },
+            { name: "Никарагуа", capital: "Манагуа", code: "ni" },
+            { name: "Новая Зеландия", capital: "Веллингтон", code: "nz" },
+            { name: "Норвегия", capital: "Осло", code: "no" },
+            { name: "ОАЭ", capital: "Абу-Даби", code: "ae" },
+            { name: "Оман", capital: "Маскат", code: "om" },
+            { name: "Пакистан", capital: "Исламабад", code: "pk" },
+            { name: "Палау", capital: "Нгерулмуд", code: "pw" },
+            { name: "Панама", capital: "Панама", code: "pa" },
+            { name: "Папуа — Новая Гвинея", capital: "Порт-Морсби", code: "pg" },
+            { name: "Парагвай", capital: "Асунсьон", code: "py" },
+            { name: "Перу", capital: "Лима", code: "pe" },
+            { name: "Польша", capital: "Варшава", code: "pl" },
+            { name: "Португалия", capital: "Лиссабон", code: "pt" },
+            { name: "Россия", capital: "Москва", code: "ru" },
+            { name: "Руанда", capital: "Кигали", code: "rw" },
+            { name: "Румыния", capital: "Бухарест", code: "ro" },
+            { name: "Сальвадор", capital: "Сан-Сальвадор", code: "sv" },
+            { name: "Самоа", capital: "Апиа", code: "ws" },
+            { name: "Сан-Марино", capital: "Сан-Марино", code: "sm" },
+            { name: "Сан-Томе и Принсипи", capital: "Сан-Томе", code: "st" },
+            { name: "Саудовская Аравия", capital: "Эр-Рияд", code: "sa" },
+            { name: "Северная Македония", capital: "Скопье", code: "mk" },
+            { name: "Сейшельские Острова", capital: "Виктория", code: "sc" },
+            { name: "Сенегал", capital: "Дакар", code: "sn" },
+            { name: "Сент-Винсент и Гренадины", capital: "Кингстаун", code: "vc" },
+            { name: "Сент-Китс и Невис", capital: "Бастер", code: "kn" },
+            { name: "Сент-Люсия", capital: "Кастри", code: "lc" },
+            { name: "Сербия", capital: "Белград", code: "rs" },
+            { name: "Сингапур", capital: "Сингапур", code: "sg" },
+            { name: "Сирия", capital: "Дамаск", code: "sy" },
+            { name: "Словакия", capital: "Братислава", code: "sk" },
+            { name: "Словения", capital: "Любляна", code: "si" },
+            { name: "Соломоновы Острова", capital: "Хониара", code: "sb" },
+            { name: "Сомали", capital: "Могадишо", code: "so" },
+            { name: "Судан", capital: "Хартум", code: "sd" },
+            { name: "Суринам", capital: "Парамарибо", code: "sr" },
+            { name: "США", capital: "Вашингтон", code: "us" },
+            { name: "Сьерра-Леоне", capital: "Фритаун", code: "sl" },
+            { name: "Таджикистан", capital: "Душанбе", code: "tj" },
+            { name: "Таиланд", capital: "Бангкок", code: "th" },
+            { name: "Танзания", capital: "Додома", code: "tz" },
+            { name: "Того", capital: "Ломе", code: "tg" },
+            { name: "Тонга", capital: "Нукуалофа", code: "to" },
+            { name: "Тринидад и Тобаго", capital: "Порт-оф-Спейн", code: "tt" },
+            { name: "Тувалу", capital: "Фунафути", code: "tv" },
+            { name: "Тунис", capital: "Тунис", code: "tn" },
+            { name: "Туркменистан", capital: "Ашхабад", code: "tm" },
+            { name: "Турция", capital: "Анкара", code: "tr" },
+            { name: "Уганда", capital: "Кампала", code: "ug" },
+            { name: "Узбекистан", capital: "Ташкент", code: "uz" },
+            { name: "Украина", capital: "Киев", code: "ua" },
+            { name: "Уругвай", capital: "Монтевидео", code: "uy" },
+            { name: "Фиджи", capital: "Сува", code: "fj" },
+            { name: "Филиппины", capital: "Манила", code: "ph" },
+            { name: "Финляндия", capital: "Хельсинки", code: "fi" },
+            { name: "Франция", capital: "Париж", code: "fr" },
+            { name: "Хорватия", capital: "Загреб", code: "hr" },
+            { name: "Центральноафриканская Республика", capital: "Банги", code: "cf" },
+            { name: "Чад", capital: "Нджамена", code: "td" },
+            { name: "Черногория", capital: "Подгорица", code: "me" },
+            { name: "Чехия", capital: "Прага", code: "cz" },
+            { name: "Чили", capital: "Сантьяго", code: "cl" },
+            { name: "Швейцария", capital: "Берн", code: "ch" },
+            { name: "Швеция", capital: "Стокгольм", code: "se" },
+            { name: "Шри-Ланка", capital: "Шри-Джаяварденепура-Котте", code: "lk" },
+            { name: "Эквадор", capital: "Кито", code: "ec" },
+            { name: "Экваториальная Гвинея", capital: "Малабо", code: "gq" },
+            { name: "Эритрея", capital: "Асмэра", code: "er" },
+            { name: "Эсватини", capital: "Мбабане", code: "sz" },
+            { name: "Эстония", capital: "Таллин", code: "ee" },
+            { name: "Эфиопия", capital: "Аддис-Абеба", code: "et" },
+            { name: "ЮАР", capital: "Претория", code: "za" },
+            { name: "Южный Судан", capital: "Джуба", code: "ss" },
+            { name: "Ямайка", capital: "Кингстон", code: "jm" },
+            { name: "Япония", capital: "Токио", code: "jp" }
+        ];
+
+        // --------------------------------------------------------------
+        // 2. ПРОСТАЯ СТАТИСТИКА: только последний ответ (true – знаю, false – не знаю)
+        // --------------------------------------------------------------
+        const STORAGE_KEY = 'flagCapitalStats';
+
+        let allCountries = COUNTRIES_DATA.map(c => ({ ...c }));
+        const sortedCountries = [...allCountries].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+        let allCapitals = allCountries.map(c => c.capital).sort((a, b) => a.localeCompare(b, 'ru'));
+
+        let stats = {}; // { code: { lastCorrect: true/false } }
+        let currentMode = 'all';
+        let state = {
+            currentCountry: null,
+            selectedCountry: null,
+            step: 'country', // 'country' | 'capital' | 'result'
+            lastResult: null, // true/false для отображения результата
+        };
+
+        // --------------------------------------------------------------
+        // 3. Загрузка и сохранение
+        // --------------------------------------------------------------
+        function loadStats() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    stats = JSON.parse(raw);
+                } else {
+                    stats = {};
+                }
+                // Для каждой страны убедимся, что есть lastCorrect (по умолчанию false)
+                allCountries.forEach(c => {
+                    if (!stats[c.code]) {
+                        stats[c.code] = { lastCorrect: false };
+                    }
+                    if (typeof stats[c.code].lastCorrect !== 'boolean') {
+                        stats[c.code].lastCorrect = false;
+                    }
+                });
+                saveStats();
+            } catch (e) {
+                stats = {};
+                allCountries.forEach(c => {
+                    stats[c.code] = { lastCorrect: false };
+                });
+                saveStats();
+            }
+        }
+
+        function saveStats() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+        }
+
+        // --------------------------------------------------------------
+        // 4. Логика статуса страны
+        // --------------------------------------------------------------
+        function isCountryKnown(code) {
+            return stats[code]?.lastCorrect === true;
+        }
+
+        function setCountryResult(code, correct) {
+            if (!stats[code]) stats[code] = { lastCorrect: false };
+            stats[code].lastCorrect = !!correct;
+            saveStats();
+            updateAllCounters();
+        }
+
+        // --------------------------------------------------------------
+        // 5. Получение отфильтрованного списка
+        // --------------------------------------------------------------
+        function getFilteredCountries() {
+            if (currentMode === 'all') {
+                return allCountries;
+            } else if (currentMode === 'unknown') {
+                return allCountries.filter(c => !isCountryKnown(c.code));
+            } else if (currentMode === 'known') {
+                return allCountries.filter(c => isCountryKnown(c.code));
+            }
+            return allCountries;
+        }
+
+        // --------------------------------------------------------------
+        // 6. Обновление счётчиков в шапке и на кнопках режимов
+        // --------------------------------------------------------------
+        function updateAllCounters() {
+            // Статистика «знаю/не знаю» больше нигде не показывается, но ведётся — фильтры удалены,
+            // а данные оставлены, чтобы ничего не сломать.
+        }
+
+        // --------------------------------------------------------------
+        // 7. Случайный выбор из текущего режима
+        // --------------------------------------------------------------
+        function getNextCountry() {
+            const filtered = getFilteredCountries();
+            if (filtered.length === 0) {
+                alert('В этом режиме нет стран. Переключитесь на другой.');
+                return allCountries[Math.floor(Math.random() * allCountries.length)];
+            }
+            const idx = Math.floor(Math.random() * filtered.length);
+            return filtered[idx];
+        }
+
+        // --------------------------------------------------------------
+        // 8. UI
+        // --------------------------------------------------------------
+        const flagImg = document.getElementById('flagImage');
+        const optionsContainer = document.getElementById('optionsContainer');
+        const btnKnow = document.getElementById('btnKnow');
+        const btnDontKnow = document.getElementById('btnDontKnow');
+        const btnMistake = document.getElementById('btnMistake');
+        const btnNext = document.getElementById('btnNext');
+        const resultBox = document.getElementById('resultBox');
+        const resultMsg = document.getElementById('resultMsg');
+        const resultDetails = document.getElementById('resultDetails');
+        const toggleFlagsBtn = document.getElementById('toggleFlags');
+        const toggleZoomBtn = document.getElementById('toggleZoom');
+        const togglePieBtn = document.getElementById('togglePie');
+        const flagZoom = document.getElementById('flagZoom');
+
+        let flagsOn = false;
+        let zoomOn = false;
+        let zoomLevel = 'medium';
+        let pieOn = false;
+        // Порядок включения: последний в списке и показывается.
+        let modeStack = [];
+        const ZOOM_STORAGE_KEY = 'flagZoomLevel';
+        const ZOOM_ON_STORAGE_KEY = 'flagZoomOn';
+        const PIE_STORAGE_KEY = 'flagPieMode';
+        const MODE_STACK_STORAGE_KEY = 'flagModeStack';
+
+        // --------------------------------------------------------------
+        // Режим Zoom: показываем не весь флаг, а его самый «информативный» фрагмент.
+        // Фрагмент ищем автоматически: окно ~1/3 ширины × 2/5 высоты, скользящее по флагу,
+        // оценка = количество заметных цветов + плотность границ. Так в кадр попадает герб,
+        // звёзды, стык полос — а не пустая однотонная область. Для каждого флага фрагмент
+        // один и тот же (кэшируется), чтобы его можно было запомнить.
+        // --------------------------------------------------------------
+        // Уровни отличаются размером окна и тем, за что оно награждается. На лёгком берём широкий
+        // кусок и ценим разнообразие цветов — видно и эмблему, и пару полос. На сложном окно узкое,
+        // и решает плотность деталей: в кадр попадает завиток герба или одна звезда. dominantLimit —
+        // доля одного цвета, выше которой кусок штрафуется: иначе «сложный» вырождается в пустой
+        // прямоугольник, который угадать нельзя, а не трудно. plainWin — запасное окно для флагов,
+        // где деталей нет вовсе (триколоры, круг на однотонном фоне): оно всегда шире рабочего,
+        // чтобы в кадр попал хотя бы стык полос.
+        const ZOOM_LEVELS = {
+            easy: {
+                label: 'Лёгкий', win: [0.45, 0.52], shrink: null, plainWin: [0.55, 0.62],
+                colorWeight: 60, edgeWeight: 4, dominantLimit: 0.80,
+            },
+            medium: {
+                label: 'Средний', win: [0.32, 0.40], shrink: 0.6, plainWin: [0.5, 0.6],
+                colorWeight: 50, edgeWeight: 6, dominantLimit: 0.85,
+            },
+            hard: {
+                label: 'Сложный', win: [0.20, 0.24], shrink: 0.75, plainWin: [0.32, 0.38],
+                colorWeight: 15, edgeWeight: 14, dominantLimit: 0.90,
+            },
+        };
+
+        const OPAQUE_ALPHA = 128;        // ниже — пустая область картинки, а не цвет флага
+        const zoomCropCache = new Map(); // "code:level" -> { sx, sy, sw, sh } в пикселях исходной картинки
+        let zoomLoadToken = 0;
+
+        function computeZoomCrop(img, level) {
+            const analysisW = 160;
+            const scale = analysisW / img.naturalWidth;
+            const W = analysisW;
+            const H = Math.max(1, Math.round(img.naturalHeight * scale));
+            const off = document.createElement('canvas');
+            off.width = W;
+            off.height = H;
+            const octx = off.getContext('2d', { willReadFrequently: true });
+            octx.drawImage(img, 0, 0, W, H);
+            const data = octx.getImageData(0, 0, W, H).data;
+
+            // Ключ цвета (4 бита на канал) и величина градиента для каждого пикселя. Прозрачные пиксели
+            // (углы картинки у флага-вымпела, например Непала) помечаются отдельно: они не цвет флага,
+            // и их граница с флагом — не деталь рисунка.
+            const keys = new Int32Array(W * H);
+            const edges = new Float32Array(W * H);
+            const gray = new Float32Array(W * H);
+            const opaque = new Uint8Array(W * H);
+            for (let i = 0; i < W * H; i++) {
+                const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+                keys[i] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+                gray[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+                opaque[i] = data[i * 4 + 3] >= OPAQUE_ALPHA ? 1 : 0;
+            }
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const i = y * W + x;
+                    const dx = x + 1 < W ? Math.abs(gray[i] - gray[i + 1]) : 0;
+                    const dy = y + 1 < H ? Math.abs(gray[i] - gray[i + W]) : 0;
+                    edges[i] = dx + dy;
+                }
+            }
+
+            // Скользящее окно wW×wH в пределах прямоугольника [x0..x1)×[y0..y1). Оценка окна:
+            // число заметных цветов (≥3% площади, чтобы отсечь антиалиасинг) + плотность границ.
+            // Границы считаем только во внутренней части окна: стык полос на самом краю фрагмента
+            // ничего не подсказывает. weights — вес цветов и границ (на 2-м этапе цвета не важны).
+            function scanWindow(wW, wH, x0, y0, x1, y1, step, colorWeight, edgeWeight, dominantLimit) {
+                const area = wW * wH;
+                const mx = Math.round(wW * 0.1);
+                const my = Math.round(wH * 0.1);
+                const innerArea = (wW - 2 * mx) * (wH - 2 * my);
+                let best = { score: -Infinity, x: x0, y: y0, distinct: 0, edgeMean: 0, dominantShare: 1, wW, wH };
+                // Запасной вариант на случай, когда окно не помещается в непрозрачную часть картинки.
+                let fallback = { ...best, y: y0 };
+                const counts = new Map();
+
+                for (let y = y0; y + wH <= y1; y += step) {
+                    for (let x = x0; x + wW <= x1; x += step) {
+                        counts.clear();
+                        let edgeSum = 0;
+                        let transparent = 0;
+                        for (let yy = y; yy < y + wH; yy++) {
+                            const row = yy * W;
+                            const inRow = yy >= y + my && yy < y + wH - my;
+                            for (let xx = x; xx < x + wW; xx++) {
+                                const i = row + xx;
+                                if (!opaque[i]) {
+                                    transparent++;
+                                    continue;
+                                }
+
+                                counts.set(keys[i], (counts.get(keys[i]) || 0) + 1);
+                                if (inRow && xx >= x + mx && xx < x + wW - mx) {
+                                    edgeSum += edges[i];
+                                }
+                            }
+                        }
+
+                        let distinct = 0;
+                        let dominant = 0;
+                        for (const c of counts.values()) {
+                            if (c >= area * 0.03) distinct++;
+                            if (c > dominant) dominant = c;
+                        }
+                        const edgeMean = edgeSum / innerArea;
+                        const dominantShare = dominant / area;
+                        // Лёгкое предпочтение центру: у триколоров без герба стык полос в середине.
+                        const cx = (x + wW / 2) / W - 0.5;
+                        const cy = (y + wH / 2) / H - 0.5;
+                        const centerPenalty = Math.sqrt(cx * cx + cy * cy) * 4;
+                        // Кусок, залитый одним цветом, отбрасывается: загадка должна быть трудной,
+                        // а не безнадёжной.
+                        const blankPenalty = dominantShare > dominantLimit
+                            ? (dominantShare - dominantLimit) * 2000
+                            : 0;
+                        const score = distinct * colorWeight + edgeMean * edgeWeight - centerPenalty - blankPenalty;
+                        const candidate = { score, x, y, distinct, edgeMean, dominantShare, wW, wH };
+                        if (score > fallback.score) {
+                            fallback = candidate;
+                        }
+
+                        // Кусок, заметно состоящий из пустоты, загадкой не является: у флага-вымпела
+                        // окно должно целиком лежать на полотне.
+                        if (transparent > area * 0.05) {
+                            continue;
+                        }
+
+                        if (score > best.score) {
+                            best = candidate;
+                        }
+                    }
+                }
+
+                return best.score > -Infinity ? best : fallback;
+            }
+
+            const cfg = ZOOM_LEVELS[level] ?? ZOOM_LEVELS.medium;
+            const win = (fw, fh) => [Math.max(8, Math.round(W * fw)), Math.max(8, Math.round(H * fh))];
+
+            // Этап 1: самая информативная область флага (герб, звёзды, стык полос).
+            let [wW, wH] = win(cfg.win[0], cfg.win[1]);
+            let best = scanWindow(wW, wH, 0, 0, W, H, 4, cfg.colorWeight, cfg.edgeWeight, cfg.dominantLimit);
+
+            if (best.edgeMean < 15) {
+                // Флаг без деталей (полосы, круг на однотонном фоне): берём окно побольше,
+                // чтобы влез хотя бы стык полос, и дальше не режем.
+                [wW, wH] = win(cfg.plainWin[0], cfg.plainWin[1]);
+                best = scanWindow(wW, wH, 0, 0, W, H, 4, cfg.colorWeight, cfg.edgeWeight, cfg.dominantLimit);
+            } else if (cfg.shrink) {
+                // Этап 2: внутри найденной области вырезаем кусок поменьше там, где деталей
+                // больше всего — получается часть эмблемы, а не вся целиком.
+                const [pW, pH] = [Math.max(8, Math.round(wW * cfg.shrink)), Math.max(8, Math.round(wH * cfg.shrink))];
+                best = scanWindow(pW, pH, best.x, best.y, best.x + wW, best.y + wH, 2, 0, 1, cfg.dominantLimit);
+            }
+
+            return {
+                sx: Math.round(best.x / scale),
+                sy: Math.round(best.y / scale),
+                sw: Math.round(best.wW / scale),
+                sh: Math.round(best.wH / scale),
+            };
+        }
+
+        // --------------------------------------------------------------
+        // Режим «Цвета»: вместо флага — круговая диаграмма долей его цветов. Оттенки, отличающиеся
+        // только сглаживанием краёв, сливаются в один сектор, иначе у каждого флага получался бы
+        // ореол из десятка почти одинаковых долек.
+        // --------------------------------------------------------------
+        const PIE_MERGE_DISTANCE = 70;  // на сколько (в RGB) цвета считаются одним и тем же
+        const PIE_MIN_SHARE = 0.005;    // мельче половины процента — уже не цвет флага
+        const PIE_BLEND_DISTANCE = 25;  // насколько близко к смеси двух цветов, чтобы счесть кусок ореолом
+        const PIE_MAX_SLICES = 8;
+        const paletteCache = new Map(); // code -> [{ r, g, b, share }]
+
+        function computePalette(img) {
+            const analysisW = 160;
+            const scale = analysisW / img.naturalWidth;
+            const W = analysisW;
+            const H = Math.max(1, Math.round(img.naturalHeight * scale));
+            const off = document.createElement('canvas');
+            off.width = W;
+            off.height = H;
+            const octx = off.getContext('2d', { willReadFrequently: true });
+            octx.drawImage(img, 0, 0, W, H);
+            const data = octx.getImageData(0, 0, W, H).data;
+
+            // Считаем пиксели по грубым корзинам (5 бит на канал), потом корзины сливаем по близости.
+            // Прозрачное не в счёт: у флага-вымпела (Непал) углы картинки пустые, а пустой пиксель
+            // приходит чёрным с нулевой альфой — иначе пол-диаграммы занял бы несуществующий чёрный.
+            const buckets = new Map();
+            let opaquePixels = 0;
+            for (let i = 0; i < W * H; i++) {
+                if (data[i * 4 + 3] < OPAQUE_ALPHA) {
+                    continue;
+                }
+
+                opaquePixels++;
+                const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+                const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+                const bucket = buckets.get(key);
+                if (bucket) {
+                    bucket.count++;
+                    bucket.r += r;
+                    bucket.g += g;
+                    bucket.b += b;
+                } else {
+                    buckets.set(key, { count: 1, r, g, b });
+                }
+            }
+
+            // От самой крупной корзины к самой мелкой: каждая либо примыкает к уже набранному цвету,
+            // либо становится новым. Так доминирующие цвета флага задают центры, а кайма краёв
+            // растворяется в них.
+            const sorted = [...buckets.values()].sort((a, b) => b.count - a.count);
+            const clusters = [];
+            for (const bucket of sorted) {
+                const r = bucket.r / bucket.count;
+                const g = bucket.g / bucket.count;
+                const b = bucket.b / bucket.count;
+                const near = clusters.find(c => Math.hypot(c.r - r, c.g - g, c.b - b) < PIE_MERGE_DISTANCE);
+                if (near) {
+                    const total = near.count + bucket.count;
+                    near.r = (near.r * near.count + r * bucket.count) / total;
+                    near.g = (near.g * near.count + g * bucket.count) / total;
+                    near.b = (near.b * near.count + b * bucket.count) / total;
+                    near.count = total;
+                } else {
+                    clusters.push({ r, g, b, count: bucket.count });
+                }
+            }
+
+            // Мелкие доли бывают двух родов: настоящий цвет небольшой фигуры (белые звёзды Папуа — 1.5%
+            // площади) и ореол сглаживания на границе двух цветов. Отличить их можно по самому цвету:
+            // ореол — это смесь своих соседей, то есть лежит на отрезке между двумя более крупными
+            // цветами, а звёзды не лежат ни на каком. Поэтому порог здесь низкий, а отсекаются именно
+            // смеси — тогда мелкий, но настоящий цвет остаётся на диаграмме.
+            const pixels = opaquePixels || 1;
+            const significant = clusters.filter(c => c.count / pixels >= PIE_MIN_SHARE);
+            const kept = significant
+                .filter((c, i) => !IsBlendOfLarger(c, significant.slice(0, i)))
+                .slice(0, PIE_MAX_SLICES);
+            const keptTotal = kept.reduce((sum, c) => sum + c.count, 0) || 1;
+
+            return kept.map(c => ({
+                r: Math.round(c.r),
+                g: Math.round(c.g),
+                b: Math.round(c.b),
+                share: c.count / keptTotal,
+            }));
+        }
+
+        /// <summary>Лежит ли цвет на отрезке между какими-нибудь двумя из более крупных — то есть смесь.</summary>
+        function IsBlendOfLarger(candidate, larger) {
+            for (let i = 0; i < larger.length; i++) {
+                for (let j = i + 1; j < larger.length; j++) {
+                    if (DistanceToSegment(candidate, larger[i], larger[j]) < PIE_BLEND_DISTANCE) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // Расстояние от цвета до отрезка a—b в RGB. Концы отрезка не считаются: смесь лежит между
+        // соседями, а не совпадает с одним из них.
+        function DistanceToSegment(c, a, b) {
+            const vx = b.r - a.r, vy = b.g - a.g, vz = b.b - a.b;
+            const lengthSquared = vx * vx + vy * vy + vz * vz;
+            if (lengthSquared === 0) {
+                return Infinity;
+            }
+
+            const t = ((c.r - a.r) * vx + (c.g - a.g) * vy + (c.b - a.b) * vz) / lengthSquared;
+            if (t < 0.15 || t > 0.85) {
+                return Infinity;
+            }
+
+            return Math.hypot(a.r + t * vx - c.r, a.g + t * vy - c.g, a.b + t * vz - c.b);
+        }
+
+        function drawPalettePie(palette) {
+            const size = 440;
+            flagZoom.classList.add('pie');
+            flagZoom.width = size;
+            flagZoom.height = size;
+            const ctx = flagZoom.getContext('2d');
+            ctx.clearRect(0, 0, size, size);
+
+            const cx = size / 2;
+            const cy = size / 2;
+            const radius = size * 0.45;
+            let angle = -Math.PI / 2;
+
+            palette.forEach(slice => {
+                const sweep = slice.share * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, radius, angle, angle + sweep);
+                ctx.closePath();
+                ctx.fillStyle = `rgb(${slice.r}, ${slice.g}, ${slice.b})`;
+                ctx.fill();
+                // Белые и очень светлые доли иначе сливались бы с фоном и друг с другом.
+                ctx.strokeStyle = 'rgba(30, 41, 59, 0.35)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                angle += sweep;
+            });
+        }
+
+        function drawZoomCrop(img, crop) {
+            const outW = 640;
+            const outH = Math.round(outW * crop.sh / crop.sw);
+            flagZoom.classList.remove('pie');
+            flagZoom.width = outW;
+            flagZoom.height = outH;
+            const ctx = flagZoom.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, outW, outH);
+        }
+
+        // Единая точка показа флага: полный, фрагмент (Zoom) или диаграмма цветов.
+        function showFlag(code, full = false) {
+            zoomLoadToken++;
+            flagImg.nextElementSibling.style.display = 'none';
+            const mode = shownMode();
+            if (mode === 'flag' || full) {
+                flagZoom.style.display = 'none';
+                flagImg.src = `https://flagcdn.com/w320/${code}.png`;
+                flagImg.style.display = 'block';
+                return;
+            }
+
+            const token = zoomLoadToken;
+            flagImg.style.display = 'none';
+            flagZoom.style.display = 'block';
+            const ctx = flagZoom.getContext('2d');
+            ctx.clearRect(0, 0, flagZoom.width, flagZoom.height);
+
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                if (token !== zoomLoadToken) return;
+                try {
+                    if (mode === 'pie') {
+                        let palette = paletteCache.get(code);
+                        if (!palette) {
+                            palette = computePalette(img);
+                            paletteCache.set(code, palette);
+                        }
+                        drawPalettePie(palette);
+                        return;
+                    }
+
+                    const cacheKey = `${code}:${zoomLevel}`;
+                    let crop = zoomCropCache.get(cacheKey);
+                    if (!crop) {
+                        crop = computeZoomCrop(img, zoomLevel);
+                        zoomCropCache.set(cacheKey, crop);
+                    }
+                    drawZoomCrop(img, crop);
+                } catch (e) {
+                    // canvas «загрязнён» (нет CORS) — показываем полный флаг
+                    showFlag(code, true);
+                }
+            };
+            img.onerror = () => {
+                if (token !== zoomLoadToken) return;
+                showFlag(code, true);
+            };
+            img.src = `https://flagcdn.com/w640/${code}.png`;
+        }
+
+        function revealFlag() {
+            if ((zoomOn || pieOn) && state.currentCountry) {
+                showFlag(state.currentCountry.code, true);
+            }
+        }
+
+        // Кнопка перебирает уровни, чтобы не занимать место отдельным селектором: уровень написан на
+        // ней самой. Выключённый Zoom помнит последний уровень — после «Цветов» или паузы игра
+        // возвращается к той сложности, которую выбрали, а не к лёгкой.
+        const ZOOM_LEVEL_CYCLE = ['easy', 'medium', 'hard'];
+
+        // Режимы не гасят друг друга: включённых может быть два, а показывается включённый последним.
+        // Выключаешь верхний — открывается тот, что был под ним. Кнопка показанного режима залита,
+        // включённого, но перекрытого — обведена.
+        function renderModeButtons() {
+            const shown = shownMode();
+            toggleZoomBtn.classList.toggle('active', shown === 'zoom');
+            toggleZoomBtn.classList.toggle('armed', zoomOn && shown !== 'zoom');
+            // Уровень написан и когда Zoom выключен: видно, на какой сложности он включится обратно.
+            toggleZoomBtn.textContent = `🔍 ${ZOOM_LEVELS[zoomLevel].label}`;
+
+            togglePieBtn.classList.toggle('active', shown === 'pie');
+            togglePieBtn.classList.toggle('armed', pieOn && shown !== 'pie');
+        }
+
+        /// <summary>Что видно сейчас: последний включённый режим, а если ничего не включено — сам флаг.</summary>
+        function shownMode() {
+            for (let i = modeStack.length - 1; i >= 0; i--) {
+                const mode = modeStack[i];
+                if ((mode === 'zoom' && zoomOn) || (mode === 'pie' && pieOn)) {
+                    return mode;
+                }
+            }
+
+            return 'flag';
+        }
+
+        function raiseMode(mode) {
+            modeStack = modeStack.filter(m => m !== mode);
+            modeStack.push(mode);
+        }
+
+        // Кнопка Zoom перебирает уровни и выключение: лёгкий → средний → сложный → выкл → лёгкий…
+        function toggleZoom() {
+            if (!zoomOn) {
+                zoomOn = true;
+                zoomLevel = ZOOM_LEVEL_CYCLE[0];
+            } else if (shownMode() !== 'zoom') {
+                // Zoom включён, но перекрыт палитрой — нажатие просто возвращает его наверх.
+            } else {
+                const next = ZOOM_LEVEL_CYCLE.indexOf(zoomLevel) + 1;
+                if (next >= ZOOM_LEVEL_CYCLE.length) {
+                    zoomOn = false;
+                } else {
+                    zoomLevel = ZOOM_LEVEL_CYCLE[next];
+                }
+            }
+
+            if (zoomOn) {
+                raiseMode('zoom');
+            }
+
+            applyModeChange();
+        }
+
+        function togglePie() {
+            pieOn = !pieOn;
+            if (pieOn) {
+                raiseMode('pie');
+            }
+
+            applyModeChange();
+        }
+
+        function applyModeChange() {
+            renderModeButtons();
+            persistDisplayMode();
+
+            if (state.currentCountry) {
+                showFlag(state.currentCountry.code, state.step === 'result');
+            }
+        }
+
+        // Уровень и включённость живут отдельно: уровень переживает любое выключение.
+        function persistDisplayMode() {
+            try {
+                localStorage.setItem(ZOOM_STORAGE_KEY, zoomLevel);
+                localStorage.setItem(ZOOM_ON_STORAGE_KEY, zoomOn ? '1' : '0');
+                localStorage.setItem(PIE_STORAGE_KEY, pieOn ? '1' : '0');
+                localStorage.setItem(MODE_STACK_STORAGE_KEY, modeStack.join(','));
+            } catch (e) {
+                // приватный режим — просто не запоминаем
+            }
+        }
+
+        function clearOptions() {
+            optionsContainer.innerHTML = '';
+        }
+
+        function createOptionButton(text, clickHandler, countryCode = null) {
+            const btn = document.createElement('button');
+            btn.textContent = text;
+            if (text.length > 16) {
+                btn.style.fontSize = '0.75rem';
+            }
+            if (flagsOn && countryCode) {
+                btn.style.backgroundImage = `url(https://flagcdn.com/w160/${countryCode}.png)`;
+                btn.classList.add('flag-mode');
+            } else {
+                btn.classList.remove('flag-mode');
+                btn.style.backgroundImage = '';
+            }
+            btn.addEventListener('click', clickHandler);
+            return btn;
+        }
+
+        function renderCountryStep() {
+            state.step = 'country';
+            state.selectedCountry = null;
+
+            showFlag(state.currentCountry.code);
+
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            btnKnow.classList.remove('hidden');
+            btnDontKnow.classList.remove('hidden');
+            btnMistake.classList.add('hidden');
+            btnNext.classList.add('hidden');
+
+            clearOptions();
+            sortedCountries.forEach(country => {
+                const btn = createOptionButton(
+                    country.name,
+                    () => onCountrySelect(country),
+                    country.code
+                );
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function onCountrySelect(country) {
+            if (state.step !== 'country') return;
+            state.selectedCountry = country;
+            renderCapitalStep();
+        }
+
+        function renderCapitalStep() {
+            state.step = 'capital';
+            state.selectedCountry = null;
+
+            btnKnow.classList.add('hidden');
+            btnDontKnow.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            btnNext.classList.add('hidden');
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+
+            clearOptions();
+            const shuffled = [...allCapitals].sort(() => Math.random() - 0.5);
+            shuffled.forEach(capital => {
+                const btn = createOptionButton(capital, () => onCapitalSelect(capital), null);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function onCapitalSelect(capital) {
+            if (state.step !== 'capital') return;
+            const isCorrect = (capital === state.currentCountry.capital);
+            state.lastResult = isCorrect;
+            // Устанавливаем статус страны
+            setCountryResult(state.currentCountry.code, isCorrect);
+            showResult(isCorrect ? 'correct' : 'wrong');
+        }
+
+        function onKnow() {
+            if (state.step !== 'country') return;
+            state.lastResult = true;
+            setCountryResult(state.currentCountry.code, true);
+            showResult('skipped');
+        }
+
+        function onDontKnow() {
+            if (state.step !== 'country') return;
+            state.lastResult = false;
+            setCountryResult(state.currentCountry.code, false);
+            showResult('dontknow');
+        }
+
+        function onMistake() {
+            // Переводим страну в "не знаю"
+            setCountryResult(state.currentCountry.code, false);
+            nextQuestion();
+        }
+
+        function showResult(type) {
+            state.step = 'result';
+            const country = state.currentCountry;
+            const correctCapital = country.capital;
+            const correctName = country.name;
+
+            revealFlag();
+            clearOptions();
+            btnKnow.classList.add('hidden');
+            btnDontKnow.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            btnNext.classList.add('hidden');
+
+            resultBox.classList.add('show');
+            resultBox.classList.remove('correct', 'wrong', 'skip', 'dontknow');
+
+            let msgText = '';
+            if (type === 'correct') {
+                resultBox.classList.add('correct');
+                msgText = 'Правильно!';
+                btnNext.classList.remove('hidden');
+                btnNext.textContent = '➡️ Далее';
+            } else if (type === 'wrong') {
+                resultBox.classList.add('wrong');
+                msgText = 'Неправильно';
+                btnNext.classList.remove('hidden');
+                btnNext.textContent = '➡️ Далее';
+            } else if (type === 'skipped') {
+                resultBox.classList.add('skip');
+                msgText = 'Вы отметили "Знаю"';
+                btnMistake.classList.remove('hidden');
+                btnNext.classList.remove('hidden');
+                btnNext.textContent = '✅ Всё верно';
+            } else if (type === 'dontknow') {
+                resultBox.classList.add('dontknow');
+                msgText = 'Вы не знаете';
+                btnNext.classList.remove('hidden');
+                btnNext.textContent = '➡️ Далее';
+            }
+            resultMsg.textContent = msgText;
+            resultDetails.innerHTML = `Страна: <strong>${correctName}</strong> &nbsp;|&nbsp; Столица: <strong>${correctCapital}</strong>`;
+        }
+
+        function nextQuestion() {
+            state.currentCountry = getNextCountry();
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            btnNext.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            renderCountryStep();
+        }
+
+        // --------------------------------------------------------------
+        // 8b. РЕЖИМ "НА ВРЕМЯ": круги, секундомер, итоги
+        // --------------------------------------------------------------
+        const hud = document.getElementById('hud');
+        const hudTimer = document.getElementById('hudTimer');
+        const hudRound = document.getElementById('hudRound');
+        const hudInRound = document.getElementById('hudInRound');
+        const hudCarry = document.getElementById('hudCarry');
+        const hudErrors = document.getElementById('hudErrors');
+        const speedExitBtn = document.getElementById('speedExit');
+        const resultsOverlay = document.getElementById('resultsOverlay');
+        const finalTimeEl = document.getElementById('finalTime');
+        const finalSubEl = document.getElementById('finalSub');
+        const finalRoundsEl = document.getElementById('finalRounds');
+        const speedModeBtn = document.getElementById('speedModeBtn');
+
+        let speedActive = false;       // идёт ли сейчас режим на время
+        let speedPool = [];            // страны, которые ещё нужно отгадать
+        let speedCurrentIdx = 0;       // индекс текущей страны внутри круга
+        let speedRound = 0;            // номер круга (с 1)
+        let speedRoundStart = 0;       // performance.now() начала текущего круга
+        let speedTotalTime = 0;        // время завершённых кругов
+        let speedTimerId = null;
+        let speedErrors = 0;           // всего неверных ответов
+        let speedMissedThisRound = 0;  // сколько стран уйдёт в следующий круг
+        let speedRoundErrorsByRound = {}; // номер круга -> ошибки в этом кругу
+        let speedCountryStats = {};    // code -> { name, code, timeMs, correct }
+        let speedQuestionStart = 0;    // performance.now() показа текущей страны
+        let speedCurrentPool = [];     // пул для текущего круга (шафл)
+        let speedRoundsLog = [];       // [{ n, time, finished, startCount, missed: [names] }]
+
+        function fmtTime(ms) {
+            const total = Math.floor(ms / 100);
+            const t = Math.floor(total / 10);
+            const dec = total % 10;
+            const m = Math.floor(t / 60);
+            const s = t % 60;
+            return `${m}:${String(s).padStart(2, '0')}.${dec}`;
+        }
+
+        function speedElapsed() {
+            return speedTotalTime + (performance.now() - speedRoundStart);
+        }
+
+        function speedTick() {
+            hudTimer.textContent = fmtTime(speedElapsed());
+        }
+
+        function updateHud() {
+            hudRound.textContent = speedRound;
+            hudInRound.textContent = Math.max(0, speedCurrentPool.length - speedCurrentIdx);
+            hudCarry.textContent = speedMissedThisRound;
+            hudErrors.textContent = speedErrors;
+        }
+
+        function startSpeedMode() {
+            speedActive = true;
+            speedPool = allCountries.slice();
+            speedRound = 0;
+            speedTotalTime = 0;
+            speedRoundStart = performance.now();
+            speedErrors = 0;
+            speedMissedThisRound = 0;
+            speedRoundErrorsByRound = {};
+            speedCountryStats = {};
+            speedRoundsLog = [];
+
+            hud.classList.add('show');
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            speedModeBtn.classList.add('active');
+            speedModeBtn.textContent = '⏱ Идёт забег…';
+            speedTick();
+            speedTimerId = setInterval(speedTick, 100);
+            speedNextRound();
+        }
+
+        function speedStopTimer() {
+            if (speedTimerId !== null) {
+                clearInterval(speedTimerId);
+                speedTimerId = null;
+            }
+        }
+
+        function restoreNormalMode() {
+            hud.classList.remove('show');
+            speedModeBtn.classList.remove('active');
+            speedModeBtn.textContent = '⏱ На время';
+            // Возврат к обычному викторинному режиму
+            state.currentCountry = getNextCountry();
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            btnNext.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            btnKnow.classList.remove('hidden');
+            btnDontKnow.classList.remove('hidden');
+            renderCountryStep();
+        }
+
+        function exitSpeedMode(showResults) {
+            if (!speedActive) return;
+            speedActive = false;
+            speedStopTimer();
+            // Закрываем незавершённый круг в логе
+            const last = speedRoundsLog[speedRoundsLog.length - 1];
+            if (last && !last.finished) {
+                last.time = performance.now() - speedRoundStart;
+                last.finished = true;
+            }
+            speedTotalTime += performance.now() - speedRoundStart;
+
+            hud.classList.remove('show');
+            restoreNormalMode();
+            if (showResults) {
+                addHistoryRecord();
+                renderFinalResults();
+                renderHistory();
+                resultsOverlay.classList.add('show');
+            }
+        }
+
+        function speedCloseResults() {
+            resultsOverlay.classList.remove('show');
+            if (!speedActive) restoreNormalMode();
+        }
+
+        function speedNextRound() {
+            if (speedRound > 0) {
+                speedTotalTime += performance.now() - speedRoundStart;
+            }
+            speedRound++;
+            speedRoundStart = performance.now();
+
+            speedCurrentPool = shuffleArray(speedPool);
+            speedCurrentIdx = 0;
+            speedMissedThisRound = 0;
+
+            speedRoundErrorsByRound[speedRound] = 0;
+            speedRoundsLog.push({ n: speedRound, time: 0, finished: false, entered: speedCurrentPool.map(c => ({ name: c.name, code: c.code })) });
+            updateHud();
+            speedAskCurrent();
+        }
+
+        function speedAskCurrent() {
+            if (speedCurrentIdx >= speedCurrentPool.length) {
+                // Круг закончен
+                const roundLog = speedRoundsLog[speedRoundsLog.length - 1];
+                roundLog.time = performance.now() - speedRoundStart;
+                roundLog.finished = true;
+                if (speedPool.length === 0) {
+                    // Все страны отгаданы — стоп!
+                    speedTotalTime += performance.now() - speedRoundStart;
+                    speedStopTimer();
+                    hud.classList.remove('show');
+                    speedModeBtn.classList.remove('active');
+                    speedModeBtn.textContent = '⏱ На время';
+                    resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+                    clearOptions();
+                    speedActive = false;
+                    addHistoryRecord();
+                    renderFinalResults();
+                    renderHistory();
+                    resultsOverlay.classList.add('show');
+                    btnKnow.classList.remove('hidden');
+                    btnDontKnow.classList.remove('hidden');
+                } else {
+                    speedNextRound();
+                }
+                return;
+            }
+            const country = speedCurrentPool[speedCurrentIdx];
+            state.currentCountry = country;
+            speedQuestionStart = performance.now();
+            // Показываем флаг, игрок выбирает страну
+            state.step = 'country';
+            btnKnow.classList.remove('hidden');
+            btnDontKnow.classList.remove('hidden');
+            btnMistake.classList.add('hidden');
+            btnNext.classList.add('hidden');
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            showFlag(country.code);
+            renderSpeedCountryOptions();
+        }
+
+        function renderSpeedCountryOptions() {
+            clearOptions();
+
+            // Страна уходит из пула, когда её отгадали или подтвердили «Знаю» — этим и отмечаем
+            // пройденное, чтобы не перебирать глазами то, что уже сделано.
+            const remaining = new Set(speedPool.map(c => c.code));
+            sortedCountries.forEach(c => {
+                const btn = createOptionButton(c.name, () => speedOnCountrySelect(c), c.code);
+                if (!remaining.has(c.code)) {
+                    btn.classList.add('done');
+                }
+
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function speedOnCountrySelect(country) {
+            if (!speedActive || state.step !== 'country') return;
+            const isCorrect = (country.code === state.currentCountry.code);
+            speedShowResult(isCorrect ? 'correct' : 'wrong', country.name);
+        }
+
+        function speedOnKnow() {
+            if (!speedActive || state.step !== 'country') return;
+            const country = state.currentCountry;
+            speedShowResult('skipped', country.name);
+        }
+
+        function speedOnDontKnow() {
+            if (!speedActive || state.step !== 'country') return;
+            speedShowResult('dontknow', state.currentCountry.name);
+        }
+
+        function speedShowResult(type, selectedName) {
+            state.step = 'result';
+            const country = state.currentCountry;
+            revealFlag();
+
+            // Копим время, потраченное на эту страну (по всем кругам)
+            if (!speedCountryStats[country.code]) {
+                speedCountryStats[country.code] = { name: country.name, code: country.code, timeMs: 0, correct: false };
+            }
+            const st = speedCountryStats[country.code];
+            st.timeMs += performance.now() - speedQuestionStart;
+            if (type === 'correct') {
+                st.correct = true;
+            }
+
+            if (type === 'correct') {
+                // Отгадана — уходит из пула навсегда.
+                // 'skipped' (Знаю) из пула НЕ удаляем: окончательное решение — за кнопкой
+                // "Всё верно" (speedConfirmKnown) или "Я ошибся" (speedOnMistake).
+                const idx = speedPool.findIndex(c => c.code === country.code);
+                if (idx !== -1) speedPool.splice(idx, 1);
+            } else if (type === 'skipped') {
+                // Ждём подтверждения: ничего не считаем
+            } else {
+                speedErrors++;
+                speedMissedThisRound++;
+                if (speedRoundErrorsByRound[speedRound] !== undefined) {
+                    speedRoundErrorsByRound[speedRound]++;
+                }
+            }
+            updateHud();
+            clearOptions();
+            btnKnow.classList.add('hidden');
+            btnDontKnow.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            btnNext.classList.add('hidden');
+
+            resultBox.classList.add('show');
+            resultBox.classList.remove('correct', 'wrong', 'skip', 'dontknow');
+
+            let msgText = '';
+            if (type === 'correct') {
+                resultBox.classList.add('correct');
+                msgText = 'Правильно!';
+            } else if (type === 'wrong') {
+                resultBox.classList.add('wrong');
+                msgText = 'Неправильно';
+            } else if (type === 'skipped') {
+                resultBox.classList.add('skip');
+                msgText = 'Вы отметили "Знаю"';
+                btnMistake.classList.remove('hidden');
+            } else if (type === 'dontknow') {
+                resultBox.classList.add('dontknow');
+                msgText = 'Вы не знаете';
+            }
+            resultMsg.textContent = msgText;
+            resultDetails.innerHTML = `Страна: <strong>${country.name}</strong> &nbsp;|&nbsp; Столица: <strong>${country.capital}</strong>`;
+
+            if (type === 'skipped') {
+                btnNext.classList.remove('hidden');
+                btnNext.textContent = '✅ Всё верно';
+            } else {
+                btnNext.classList.remove('hidden');
+                btnNext.textContent = '➡️ Далее';
+            }
+        }
+
+        function speedNextQuestion() {
+            speedCurrentIdx++;
+            updateHud();
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            btnNext.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            speedAskCurrent();
+        }
+
+        function speedOnMistake() {
+            if (!speedActive || state.step !== 'result') return;
+            speedErrors++;
+            speedMissedThisRound++;
+            if (speedRoundErrorsByRound[speedRound] !== undefined) {
+                speedRoundErrorsByRound[speedRound]++;
+            }
+            updateHud();
+            speedNextQuestion();
+        }
+
+        // "Всё верно" после "Знаю" — только теперь страна окончательно уходит из пула
+        function speedConfirmKnown() {
+            if (!speedActive || state.step !== 'result') return;
+            const country = state.currentCountry;
+            const idx = speedPool.findIndex(c => c.code === country.code);
+            if (idx !== -1) speedPool.splice(idx, 1);
+            if (speedCountryStats[country.code]) {
+                speedCountryStats[country.code].correct = true;
+            }
+            updateHud();
+            speedNextQuestion();
+        }
+
+        function shuffleArray(arr) {
+            const a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function renderFinalResults() {
+            finalTimeEl.textContent = fmtTime(speedTotalTime);
+            finalSubEl.textContent = `Кругов: ${speedRoundsLog.length} · Ошибок: ${speedErrors}`;
+            let html = '';
+            speedRoundsLog.forEach((r) => {
+                const errs = speedRoundErrorsByRound[r.n] || 0;
+                html += `<div class="round-block">`;
+                html += `<div class="round-title"><span>Круг ${r.n} <span class="round-err">· ${errs} ошиб.</span></span><span>${fmtTime(r.time)}</span></div>`;
+                if (r.n > 1 && r.entered && r.entered.length > 0) {
+                    html += `<div class="round-flags">`;
+                    r.entered.forEach(c => {
+                        html += `<img class="flag-ico" src="https://flagcdn.com/w40/${c.code}.png" alt="${c.name}" title="${c.name}">`;
+                    });
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            });
+            finalRoundsEl.innerHTML = html;
+
+            // Таблица: время на каждую страну, по убыванию
+            const rows = Object.values(speedCountryStats).sort((a, b) => b.timeMs - a.timeMs);
+            let tableHtml = '<div class="ctable-title">⏳ Время на страну</div>';
+            tableHtml += '<table class="ctable"><tbody>';
+            rows.forEach(r => {
+                tableHtml += `<tr>` +
+                    `<td><img class="flag-ico" src="https://flagcdn.com/w40/${r.code}.png" alt="" title="${r.name}">${r.name}</td>` +
+                    `<td class="t ${r.correct ? 'ok' : 'fail'}">${fmtTime(r.timeMs)}</td>` +
+                    `</tr>`;
+            });
+            tableHtml += '</tbody></table>';
+            finalRoundsEl.innerHTML += tableHtml;
+        }
+
+        // --------------------------------------------------------------
+        // 8c. История забегов (localStorage) + экспорт
+        // --------------------------------------------------------------
+        const HISTORY_KEY = 'speedrunHistory';
+        const historyWrap = document.getElementById('historyWrap');
+
+        function loadHistory() {
+            try {
+                const raw = localStorage.getItem(HISTORY_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveHistory(list) {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+        }
+
+        function addHistoryRecord() {
+            const list = loadHistory();
+            list.push({
+                date: new Date().toISOString(),
+                totalTimeMs: Math.round(speedTotalTime),
+                rounds: speedRoundsLog.length,
+                errors: speedErrors
+            });
+            saveHistory(list);
+        }
+
+        function deleteHistoryRecord(idx) {
+            const list = loadHistory();
+            list.splice(idx, 1);
+            saveHistory(list);
+            renderHistory();
+        }
+
+        function clearHistory() {
+            if (!confirm('Удалить всю историю забегов?')) return;
+            saveHistory([]);
+            renderHistory();
+        }
+
+        function fmtHistoryDate(iso) {
+            const d = new Date(iso);
+            const pad = (x) => String(x).padStart(2, '0');
+            return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function renderHistory() {
+            const list = loadHistory().slice().reverse();
+            if (list.length === 0) {
+                historyWrap.innerHTML = '<div style="color:#94a3b8;font-size:0.85rem;text-align:left;">Пока нет забегов</div>';
+                return;
+            }
+            let html = '<table class="history-table"><thead><tr>' +
+                '<th>Дата и время</th><th class="num">Время</th><th class="num">Кругов</th><th class="num">Ошибок</th><th></th>' +
+                '</tr></thead><tbody>';
+            list.forEach((rec, i) => {
+                const idx = list.length - 1 - i;
+                html += `<tr>` +
+                    `<td>${fmtHistoryDate(rec.date)}</td>` +
+                    `<td class="num">${fmtTime(rec.totalTimeMs)}</td>` +
+                    `<td class="num">${rec.rounds}</td>` +
+                    `<td class="num">${rec.errors}</td>` +
+                    `<td><button class="del-btn" data-idx="${idx}" title="Удалить запись">🗑</button></td>` +
+                    `</tr>`;
+            });
+            html += '</tbody></table>';
+            historyWrap.innerHTML = html;
+            historyWrap.querySelectorAll('.del-btn').forEach(btn => {
+                btn.addEventListener('click', () => deleteHistoryRecord(parseInt(btn.dataset.idx, 10)));
+            });
+        }
+
+        function exportHistory() {
+            const list = loadHistory();
+            const blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'speedrun-history.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --------------------------------------------------------------
+        // 9. Обработчики клавиш
+        // --------------------------------------------------------------
+        function handleKeyDown(e) {
+            const key = e.key;
+            if (key === 'Escape') {
+                if (speedActive) exitSpeedMode(false);
+                else if (resultsOverlay.classList.contains('show')) speedCloseResults();
+                return;
+            }
+            if (resultsOverlay.classList.contains('show')) return;
+            if (speedActive) {
+                if (state.step === 'country') {
+                    if (key === 'Enter') {
+                        e.preventDefault();
+                        if (!btnKnow.classList.contains('hidden')) btnKnow.click();
+                    }
+                    if (key === ' ' || key === 'Space') {
+                        e.preventDefault();
+                        if (!btnDontKnow.classList.contains('hidden')) btnDontKnow.click();
+                    }
+                } else if (state.step === 'result') {
+                    if (key === 'Enter') {
+                        e.preventDefault();
+                        if (!btnNext.classList.contains('hidden')) btnNext.click();
+                    }
+                    if (key === ' ' || key === 'Space') {
+                        e.preventDefault();
+                        if (!btnMistake.classList.contains('hidden')) btnMistake.click();
+                        else if (!btnNext.classList.contains('hidden')) btnNext.click();
+                    }
+                }
+                return;
+            }
+            if (state.step === 'country') {
+                if (key === 'Enter') {
+                    e.preventDefault();
+                    if (!btnKnow.classList.contains('hidden')) btnKnow.click();
+                }
+                if (key === ' ' || key === 'Space') {
+                    e.preventDefault();
+                    if (!btnDontKnow.classList.contains('hidden')) btnDontKnow.click();
+                }
+            } else if (state.step === 'result') {
+                if (key === 'Enter') {
+                    e.preventDefault();
+                    if (!btnNext.classList.contains('hidden')) btnNext.click();
+                }
+                if (key === ' ' || key === 'Space') {
+                    e.preventDefault();
+                    if (!btnMistake.classList.contains('hidden')) btnMistake.click();
+                    else if (!btnNext.classList.contains('hidden')) btnNext.click();
+                }
+            }
+        }
+
+        // --------------------------------------------------------------
+        // 10. Переключение режимов и флагов
+        // --------------------------------------------------------------
+        function setMode(mode) {
+            // Фильтры удалены: остался только режим "На время". Оставлено на случай возврата.
+        }
+
+        function toggleFlags() {
+            flagsOn = !flagsOn;
+            toggleFlagsBtn.classList.toggle('active', flagsOn);
+            if (speedActive) {
+                if (state.step === 'country') renderSpeedCountryOptions();
+                return;
+            }
+            if (state.step === 'country') {
+                // перерисовать кнопки стран с новым режимом флагов
+                clearOptions();
+                sortedCountries.forEach(country => {
+                    const btn = createOptionButton(
+                        country.name,
+                        () => onCountrySelect(country),
+                        country.code
+                    );
+                    optionsContainer.appendChild(btn);
+                });
+            }
+        }
+
+        // --------------------------------------------------------------
+        // 11. Инициализация
+        // --------------------------------------------------------------
+        function init() {
+            loadStats();
+            updateAllCounters();
+
+            btnKnow.addEventListener('click', () => speedActive ? speedOnKnow() : onKnow());
+            btnDontKnow.addEventListener('click', () => speedActive ? speedOnDontKnow() : onDontKnow());
+            btnMistake.addEventListener('click', () => speedActive ? speedOnMistake() : onMistake());
+            btnNext.addEventListener('click', () => {
+                if (!speedActive) { nextQuestion(); return; }
+                // "Всё верно" после "Знаю" = подтверждение; иначе просто Далее
+                if (state.step === 'result' && !btnMistake.classList.contains('hidden')) {
+                    speedConfirmKnown();
+                } else {
+                    speedNextQuestion();
+                }
+            });
+
+            toggleFlagsBtn.addEventListener('click', toggleFlags);
+            toggleZoomBtn.addEventListener('click', toggleZoom);
+            togglePieBtn.addEventListener('click', togglePie);
+
+            try {
+                const savedLevel = localStorage.getItem(ZOOM_STORAGE_KEY);
+                if (savedLevel && ZOOM_LEVEL_CYCLE.includes(savedLevel)) {
+                    zoomLevel = savedLevel;
+                }
+
+                zoomOn = localStorage.getItem(ZOOM_ON_STORAGE_KEY) === '1';
+                pieOn = localStorage.getItem(PIE_STORAGE_KEY) === '1';
+                modeStack = (localStorage.getItem(MODE_STACK_STORAGE_KEY) ?? '')
+                    .split(',')
+                    .filter(m => m === 'zoom' || m === 'pie');
+            } catch (e) {
+                // приватный режим — остаёмся на значениях по умолчанию
+            }
+
+            // Включённый режим, которого нет в сохранённом порядке (первый запуск после обновления),
+            // всё равно должен показаться.
+            if (zoomOn && !modeStack.includes('zoom')) {
+                modeStack.unshift('zoom');
+            }
+
+            if (pieOn && !modeStack.includes('pie')) {
+                modeStack.push('pie');
+            }
+
+            renderModeButtons();
+            speedModeBtn.addEventListener('click', () => {
+                if (!speedActive) startSpeedMode();
+            });
+            speedExitBtn.addEventListener('click', () => exitSpeedMode(true));
+            document.getElementById('speedAgain').addEventListener('click', () => {
+                resultsOverlay.classList.remove('show');
+                startSpeedMode();
+            });
+            document.getElementById('speedClose').addEventListener('click', speedCloseResults);
+            document.getElementById('historyExport').addEventListener('click', exportHistory);
+            document.getElementById('historyClear').addEventListener('click', clearHistory);
+
+            document.addEventListener('keydown', handleKeyDown);
+
+            state.currentCountry = getNextCountry();
+            renderCountryStep();
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
