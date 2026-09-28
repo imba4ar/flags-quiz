@@ -179,6 +179,8 @@
         .flag-area canvas {
             width: 200px;
         }
+        /* Фейковый флаг (canvas) показывается в размере настоящего img — иначе игрок
+           отличал бы фейк по размеру. Инлайн-стиль width:320px в showFlagCanvas. */
         /* Диаграмма цветов — круг на прозрачном фоне: рамка и подложка флага ей не нужны. */
         .flag-area canvas.pie {
             border: none;
@@ -873,7 +875,20 @@
 </head>
 <body>
     <div id="changelogHover">
-        <div class="ver">1.1.0 — Новое</div>
+        <div class="ver">1.2.1-beta — Новое</div>
+        <ul>
+            <li>Умный генератор фейков: свап/инверсия полос, удаление и масштабирование элементов</li>
+            <li>Перекраска теперь запасной оператор, а не основной</li>
+            <li>Контроль «пустых» фейков и подпись того, что изменено</li>
+            <li>100 раундов готовятся заранее с прогрессом, без повторов стран</li>
+        </ul>
+        <div class="ver">1.2.0 — Режим «Фейк?»</div>
+        <ul>
+            <li>100 флагов — существует или нет (Enter/Пробел)</li>
+            <li>Фейковые флаги перекрашиваются цветами из палитры всех флагов мира</li>
+            <li>Статистика и список ошибок в конце</li>
+        </ul>
+        <div class="ver">1.1.0 — Подсказка цветов</div>
         <ul>
             <li>Тумблер показа процентов на пайчарте</li>
             <li>Подсказка RGB/HEX при наведении на сектор пайчарта</li>
@@ -896,6 +911,8 @@
                 <div class="mode-selector">
                     <button id="speedModeBtn">⏱ На время</button>
                     <span class="divider"></span>
+                    <button id="fakeModeBtn" title="Существует ли флаг? 100 раундов">🎨 Фейк?</button>
+                    <span class="divider"></span>
                     <button id="toggleFlags" class="toggle-flags">🏳️ Флаги</button>
                     <button id="toggleZoom" class="toggle-flags" title="Показывать только фрагмент флага">🔍 Zoom</button>
                     <button id="togglePie" class="toggle-flags" title="Показывать только доли цветов флага">🥧 Цвета</button>
@@ -911,7 +928,7 @@
 
             <div class="version-corner">
                 <span id="newVersionLabel" class="hidden">Новая версия</span>
-                <span id="versionBadge">v1.1.0</span>
+                <span id="versionBadge">v1.2.1-beta</span>
             </div>
 
             <div class="right-actions">
@@ -925,6 +942,15 @@
         <div class="result-box" id="resultBox">
             <div class="msg" id="resultMsg">Правильно!</div>
             <div class="details" id="resultDetails">Страна: <strong>Россия</strong>, Столица: <strong>Москва</strong></div>
+        </div>
+
+        <div class="hud" id="fakeHud">
+            <div class="pill timer">⏱ <span id="fakeTimer">0:00.0</span></div>
+            <div class="pill">Раунд <span id="fakeRound">1</span>/100</div>
+            <div class="pill">Баллы: <span id="fakeScore">0</span></div>
+            <div class="pill">Ошибки: <span id="fakeErrors">0</span></div>
+            <div class="spacer"></div>
+            <button id="fakeExit">⏹ Завершить</button>
         </div>
 
         <div class="hud" id="hud">
@@ -955,7 +981,21 @@
                     <button id="historyClear">🗑 Очистить всё</button>
                 </div>
             </div>
-        </div>            <div class="options-grid" id="optionsContainer"></div>
+        </div>
+
+        <div class="overlay" id="fakeOverlay">
+            <div class="overlay-card">
+                <h2>🎨 Результат: <span id="fakeFinalScore">0</span>/100</h2>
+                <div class="big-time" id="fakeFinalTime">0:00.0</div>
+                <div class="sub" id="fakeFinalSub"></div>
+                <div class="rounds" id="fakeMistakes"></div>
+                <div class="overlay-actions">
+                    <button class="again" id="fakeAgain">🔁 Заново</button>
+                    <button class="exit" id="fakeClose">Вернуться в обычный режим</button>
+                </div>
+            </div>
+        </div>
+            <div class="options-grid" id="optionsContainer"></div>
 
             <div id="pieHover">
                 <canvas id="pieHoverCanvas"></canvas>
@@ -1479,9 +1519,12 @@
 
         function computePalette(img) {
             const analysisW = 160;
-            const scale = analysisW / img.naturalWidth;
+            // Источник может быть и Image, и canvas — у canvas нет naturalWidth.
+            const srcW = img.naturalWidth || img.width;
+            const srcH = img.naturalHeight || img.height;
+            const scale = analysisW / srcW;
             const W = analysisW;
-            const H = Math.max(1, Math.round(img.naturalHeight * scale));
+            const H = Math.max(1, Math.round(srcH * scale));
             const off = document.createElement('canvas');
             off.width = W;
             off.height = H;
@@ -1709,7 +1752,10 @@
             const mode = shownMode();
             if (mode === 'flag' || full) {
                 flagZoom.style.display = 'none';
-                flagImg.src = `https://flagcdn.com/w320/${code}.png`;
+                flagZoom.style.width = '';
+                // SVG вместо PNG: во всех режимах флаги рисуются одним источником,
+                // фейковые флаги (canvas) выглядят так же, как настоящие.
+                flagImg.src = `https://flagcdn.com/${code}.svg`;
                 flagImg.style.display = 'block';
                 return;
             }
@@ -2042,7 +2088,7 @@
         const versionBadge = document.getElementById('versionBadge');
         const changelogHover = document.getElementById('changelogHover');
         const newVersionLabel = document.getElementById('newVersionLabel');
-        const APP_VERSION = '1.1.0';
+        const APP_VERSION = '1.2.1-beta';
         const SEEN_VERSION_KEY = 'seenVersion';
 
         try {
@@ -2299,6 +2345,12 @@
 
         function restoreNormalMode() {
             hud.classList.remove('show');
+            fakeHud.classList.remove('show');
+            fakeModeBtn.classList.remove('active');
+            fakeModeBtn.textContent = '🎨 Фейк?';
+            // Кнопки «Существует/Не существует» не должны переживать выход из режима.
+            fakeBtnYes.classList.add('hidden');
+            fakeBtnNo.classList.add('hidden');
             speedModeBtn.classList.remove('active');
             speedModeBtn.textContent = '⏱ На время';
             // Возврат к обычному викторинному режиму
@@ -2665,11 +2717,33 @@
         function handleKeyDown(e) {
             const key = e.key;
             if (key === 'Escape') {
-                if (speedActive) exitSpeedMode(false);
+                if (fakeActive) fakeExitMode();
+                else if (speedActive) exitSpeedMode(false);
                 else if (resultsOverlay.classList.contains('show')) speedCloseResults();
+                else if (fakeOverlay.classList.contains('show')) fakeCloseResults();
                 return;
             }
+            if (fakeOverlay.classList.contains('show')) return;
             if (resultsOverlay.classList.contains('show')) return;
+            if (fakeActive) {
+                if (state.step === 'fake-question') {
+                    if (key === 'Enter') {
+                        e.preventDefault();
+                        fakeAnswer(true);
+                    }
+                    if (key === ' ' || key === 'Space') {
+                        e.preventDefault();
+                        fakeAnswer(false);
+                    }
+                } else if (state.step === 'fake-feedback') {
+                    // После ответа любой из двух кнопок двигает дальше.
+                    if (key === 'Enter' || key === ' ' || key === 'Space') {
+                        e.preventDefault();
+                        fakeNext();
+                    }
+                }
+                return;
+            }
             if (speedActive) {
                 if (state.step === 'country') {
                     if (key === 'Enter') {
@@ -2754,6 +2828,7 @@
             btnDontKnow.addEventListener('click', () => speedActive ? speedOnDontKnow() : onDontKnow());
             btnMistake.addEventListener('click', () => speedActive ? speedOnMistake() : onMistake());
             btnNext.addEventListener('click', () => {
+                if (fakeActive) { fakeNext(); return; }
                 if (!speedActive) { nextQuestion(); return; }
                 // "Всё верно" после "Знаю" = подтверждение; иначе просто Далее
                 if (state.step === 'result' && !btnMistake.classList.contains('hidden')) {
@@ -2762,6 +2837,16 @@
                     speedNextQuestion();
                 }
             });
+
+            fakeModeBtn.addEventListener('click', () => {
+                if (!fakeActive && !speedActive) fakeStartMode();
+            });
+            fakeExitBtn.addEventListener('click', () => fakeExitMode());
+            document.getElementById('fakeAgain').addEventListener('click', () => {
+                fakeOverlay.classList.remove('show');
+                fakeStartMode();
+            });
+            document.getElementById('fakeClose').addEventListener('click', fakeCloseResults);
 
             toggleFlagsBtn.addEventListener('click', toggleFlags);
             toggleZoomBtn.addEventListener('click', toggleZoom);
@@ -2796,7 +2881,7 @@
 
             renderModeButtons();
             speedModeBtn.addEventListener('click', () => {
-                if (!speedActive) startSpeedMode();
+                if (!speedActive && !fakeActive) startSpeedMode();
             });
             speedExitBtn.addEventListener('click', () => exitSpeedMode(true));
             document.getElementById('speedAgain').addEventListener('click', () => {
@@ -2811,6 +2896,812 @@
 
             state.currentCountry = getNextCountry();
             renderCountryStep();
+        }
+
+        // --------------------------------------------------------------
+        // 11. Режим «Фейк?»: 100 флагов, существующий или нет.
+        // Настоящие флаги берём из списка стран; фейковые делаем сами — перекрашиваем
+        // один из цветов флага в другой цвет из «флаговой» палитры. Палитра всех цветов
+        // собрана заранее из всех флагов (computePalette по каждому), поэтому перекраска
+        // не даёт неестественных цветов. Каждый сгенерированный фейк проверяем на совпадение
+        // с реальными флагами по палитрам — коллизий быть не должно.
+        // --------------------------------------------------------------
+        const FAKE_ROUNDS = 100;
+        const FAKE_STORAGE_HISTORY = 'fakeModeHistory';
+
+        const fakeModeBtn = document.getElementById('fakeModeBtn');
+        const fakeHud = document.getElementById('fakeHud');
+        const fakeTimerEl = document.getElementById('fakeTimer');
+        const fakeRoundEl = document.getElementById('fakeRound');
+        const fakeScoreEl = document.getElementById('fakeScore');
+        const fakeErrorsEl = document.getElementById('fakeErrors');
+        const fakeExitBtn = document.getElementById('fakeExit');
+        const fakeOverlay = document.getElementById('fakeOverlay');
+        const fakeFinalScoreEl = document.getElementById('fakeFinalScore');
+        const fakeFinalTimeEl = document.getElementById('fakeFinalTime');
+        const fakeFinalSubEl = document.getElementById('fakeFinalSub');
+        const fakeMistakesEl = document.getElementById('fakeMistakes');
+
+        let fakeActive = false;
+        let fakeRound = 0;          // 1..100
+        let fakeScore = 0;
+        let fakeErrors = 0;
+        let fakeCurrent = null;     // { isReal, code, canvasUrl, realCode }
+        let fakeStart = 0;
+        let fakeTimerId = null;
+        let fakeLog = [];           // { round, isReal, answerReal, correct, code }
+
+        // Кнопка Enter/Пробел этого режима живёт в right-actions, как у забега.
+        const fakeBtnYes = document.createElement('button');
+        fakeBtnYes.className = 'primary hidden';
+        fakeBtnYes.id = 'fakeBtnYes';
+        fakeBtnYes.dataset.key = 'Enter';
+        fakeBtnYes.textContent = '✅ Существует';
+        const fakeBtnNo = document.createElement('button');
+        fakeBtnNo.className = 'danger hidden';
+        fakeBtnNo.id = 'fakeBtnNo';
+        fakeBtnNo.dataset.key = 'Пробел';
+        fakeBtnNo.textContent = '❌ Не существует';
+        document.querySelector('.right-actions').prepend(fakeBtnNo, fakeBtnYes);
+        fakeBtnYes.addEventListener('click', () => fakeAnswer(true));
+        fakeBtnNo.addEventListener('click', () => fakeAnswer(false));
+
+        // ------- Палитра всех флагов -------
+        // Собирается один раз лениво: по computePalette каждого флага. Пока не готова,
+        // режим просит подождать (флаги грузятся параллельно, ~секунды).
+        let flagColorsPromise = null;
+
+        function getFlagColors() {
+            if (flagColorsPromise) return flagColorsPromise;
+            flagColorsPromise = Promise.all(allCountries.map(c => new Promise(resolve => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        resolve(computePalette(img).map(s => [s.r, s.g, s.b]));
+                    } catch (e) {
+                        resolve([]);
+                    }
+                };
+                img.onerror = () => resolve([]);
+                img.src = `https://flagcdn.com/w640/${c.code}.png`;
+            }))).then(list => {
+                const set = new Set();
+                list.forEach(colors => colors.forEach(rgb => set.add(rgb.join(','))));
+                return [...set].map(s => s.split(',').map(Number));
+            });
+            return flagColorsPromise;
+        }
+
+        // Ближайший цвет палитры в RGB-евклидовой метрике.
+        function nearestPaletteColor(r, g, b, colors) {
+            let best = null, bestD = Infinity;
+            for (const [pr, pg, pb] of colors) {
+                const d = (pr - r) ** 2 + (pg - g) ** 2 + (pb - b) ** 2;
+                if (d < bestD) { bestD = d; best = [pr, pg, pb]; }
+            }
+            return best;
+        }
+
+        // Отличаются ли палитры достаточно, чтобы считать флаги разными?
+        // Палитры отсортированы по доле; сравниваем попарно с допуском в 40 по каналу.
+        function palettesDiffer(a, b) {
+            if (a.length !== b.length) return true;
+            for (let i = 0; i < a.length; i++) {
+                const d = Math.hypot(a[i].r - b[i].r, a[i].g - b[i].g, a[i].b - b[i].b);
+                if (d > 40) return true;
+            }
+            return false;
+        }
+
+        // ------- Перекраска -------
+        // Фейк делаем из SVG флага: заменяем fill одного из цветов прямо в разметке и
+        // рендерим в canvas. Края остаются векторными — заливка «в пейнте» исключена.
+        // Возвращает { svgDataUrl, canvas, fromHex, toHex } или null.
+        function hexToRgb(hex) {
+            let h = hex.replace('#', '');
+            if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+            return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+        }
+
+        function rgbToHex(rgb) {
+            return '#' + rgb.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+        }
+
+        // Все цвета, встречающиеся в SVG-разметке (hex 6- и 3-значные).
+        function svgColors(svgText) {
+            const set = new Map(); // hex-нормализованный -> [r,g,b]
+            const re = /#([0-9a-f]{6}|[0-9a-f]{3})\b/gi;
+            let m;
+            while ((m = re.exec(svgText)) !== null) {
+                const rgb = hexToRgb(m[1]);
+                set.set(rgb.join(','), rgb);
+            }
+            return [...set.values()];
+        }
+
+        // Рендер SVG-строки в canvas (для валидации трансформаций).
+        async function renderSvgToCanvas(svgText) {
+            const blob = new Blob([svgText], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            try {
+                const img = await new Promise(resolve => {
+                    const im = new Image();
+                    im.onload = () => resolve(im);
+                    im.onerror = () => resolve(null);
+                    im.src = url;
+                });
+                if (!img) return null;
+                const w = img.naturalWidth || 640;
+                const h = img.naturalHeight || Math.round(w * 2 / 3);
+                const cv = document.createElement('canvas');
+                cv.width = w;
+                cv.height = h;
+                cv.getContext('2d').drawImage(img, 0, 0, w, h);
+                return cv;
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // Насколько флаги различаются по пикселям (доля непрозрачных пикселей с отличием > 60).
+        async function pixelDiffFraction(svgA, svgB) {
+            const [ca, cb] = await Promise.all([renderSvgToCanvas(svgA), renderSvgToCanvas(svgB)]);
+            if (!ca || !cb || ca.width !== cb.width || ca.height !== cb.height) return 0;
+            const a = ca.getContext('2d').getImageData(0, 0, ca.width, ca.height).data;
+            const b = cb.getContext('2d').getImageData(0, 0, cb.width, cb.height).data;
+            let changed = 0, opaque = 0;
+            for (let i = 0; i < a.length; i += 4) {
+                if (a[i + 3] < 128) continue;
+                opaque++;
+                if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) {
+                    changed++;
+                }
+            }
+            return changed / (opaque || 1);
+        }
+
+        function svgToDataUrl(svgText) {
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+        }
+
+        // ======================================================================
+        // Генератор фейков: парсим SVG флага в DOM и применяем один из операторов.
+        // Операторы придуманы по принципу «что делает флаг флагом»: цвета полос,
+        // чередование полос, элементы (звёзды, эмблемы, орнаменты). Никаких захардкоженных
+        // стран: оператор выбирается по тому, что структурно есть в конкретном SVG.
+        // ======================================================================
+
+        // Разбираем SVG и подключаем к живому DOM (скрытый контейнер): только так доступны
+        // точные getBBox() элементов. Хост один, удаляется в releaseSvg.
+        let svgMeasureHost = null;
+
+        function parseSvg(svgText) {
+            const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+            if (doc.querySelector('parsererror')) return null;
+            const root = doc.documentElement;
+            const vb = (root.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number);
+            // Размеры берём из viewBox: контент флага живёт в его координатах (у flagcdn
+            // width/height часто меньше в разы — только экранный размер).
+            let width = (vb.length === 4 && isFinite(vb[2]) && vb[2] > 0) ? vb[2] : parseFloat(root.getAttribute('width'));
+            let height = (vb.length === 4 && isFinite(vb[3]) && vb[3] > 0) ? vb[3] : parseFloat(root.getAttribute('height'));
+            if (!isFinite(width)) width = 640;
+            if (!isFinite(height)) height = width * 2 / 3;
+            if (width <= 0 || height <= 0) return null;
+
+            // root переносится в живой DOM целиком (adoptNode внутри appendChild). ВАЖНО:
+            // после переноса doc.querySelectorAll пуст — все выборки делаем от root.
+            svgMeasureHost = document.createElement('div');
+            svgMeasureHost.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden';
+            svgMeasureHost.appendChild(root);
+            document.body.appendChild(svgMeasureHost);
+            svgRoots.set(doc, root);
+            return { doc, root, width, height };
+        }
+
+        function releaseSvg() {
+            if (svgMeasureHost) {
+                svgMeasureHost.remove();
+                svgMeasureHost = null;
+            }
+        }
+
+        // Сериализация обратно в строку с нужными xmlns (после DOM-манипуляций).
+        // Внимание: после parseSvg корень отдан в живой DOM и adoptNode отвязал его от doc —
+        // работаем напрямую с корнем, который вернула parseSvg (через WeakMap-карту).
+        const svgRoots = new WeakMap(); // doc -> root
+
+        function serializeSvg(doc) {
+            const root = svgRoots.get(doc);
+            if (!root) return null;
+            root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            if (!root.getAttribute('xmlns:xlink')) root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+            return new XMLSerializer().serializeToString(root);
+        }        // Собираем «живые» элементы с их bbox. Без defs, клип-путей и градиентов.
+        // doc.documentElement пуст после переноса root в живой DOM — достаём root через svgRoots.
+        function drawableElements(doc) {
+            const rootEl = doc.documentElement || svgRoots.get(doc);
+            return [...rootEl.querySelectorAll('rect, path, polygon, circle, ellipse, use, g')]
+                .filter(el => !el.closest('defs'))
+                .map(el => ({ el, bbox: elementBBox(el) }))
+                .filter(e => e.bbox);
+        }
+
+        // Точный bbox элемента через getBBox (элемент подключён к живому DOM).
+        // Возвращает { cx, cy, w, h } или null. Если у элемента свой translate — прибавляем его.
+        function elementBBox(el) {
+            try {
+                const b = el.getBBox();
+                if (!isFinite(b.x) || b.width <= 0 || b.height <= 0) return null;
+                let ox = 0, oy = 0;
+                const t = el.getAttribute('transform');
+                if (t) {
+                    const m = t.match(/translate\s*\(\s*([\d.eE+-]+)[\s,]*([\d.eE+-]*)/i);
+                    if (m) { ox = parseFloat(m[1]) || 0; oy = parseFloat(m[2] || 0); }
+                }
+                return { cx: b.x + b.width / 2 + ox, cy: b.y + b.height / 2 + oy, w: b.width, h: b.height };
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Горизонтальные/вертикальные полосы: rect или path на всю ширину/высоту флага.
+        // У flagcdn полосы часто нарисованы path'ами в координатах viewBox — работаем по bbox.
+        function findStripes(doc, width, height) {
+            const els = drawableElements(doc);
+            const horizontal = [], vertical = [];
+            for (const { el, bbox } of els) {
+                const tag = el.tagName.toLowerCase();
+                if (tag !== 'rect' && tag !== 'path') continue;
+                const fill = (el.getAttribute('fill') || '').trim();
+                if (!/^#/.test(fill)) continue;
+                // горизонтальная: на всю ширину, заметно уже по высоте
+                if (bbox.w > width * 0.98 && bbox.h < height * 0.95) {
+                    horizontal.push({ el, y: bbox.cy - bbox.h / 2, h: bbox.h, fill });
+                } else if (bbox.h > height * 0.98 && bbox.w < width * 0.95) {
+                    vertical.push({ el, x: bbox.cx - bbox.w / 2, w: bbox.w, fill });
+                }
+            }
+            horizontal.sort((a, b) => a.y - b.y);
+            vertical.sort((a, b) => a.x - b.x);
+            return { horizontal, vertical };
+        }
+
+        // Перестановка цветов полос — главный оператор. Варианты:
+        // 1) инверсия чередования многоцветных (Ангола: красный-чёрный → чёрный-красный);
+        // 2) свап двух полос у многоцветных (ОАЭ, ЦАР);
+        // 3) свап у двухполосных горизонтальных/вертикальных, если у флага нет кантона
+        //    (Польша, Индонезия, Мальта): просто цвета меняются местами;
+        // 4) свап цветов stroke-полос (Кирибати: волны) — stroke перекрашивается в цвет другой полосы.
+        function opSwapStripes(doc, width, height) {
+            const { horizontal, vertical } = findStripes(doc, width, height);
+
+            // Вариант 4: stroke-полосы (волны Кирибати, кресты) — меняем stroke на цвет другой полосы.
+            const strokeEls = drawableElements(doc).filter(({ el, bbox }) => {
+                if (!el || typeof el.getAttribute !== 'function') return false; // use-обёртки и прочее
+                const tag = el.tagName.toLowerCase();
+                if (tag !== 'path' && tag !== 'rect') return false;
+                const stroke = (el.getAttribute('stroke') || '').trim();
+                if (!/^#/.test(stroke)) return false;
+                const sw = parseFloat(el.getAttribute('stroke-width')) || 0;
+                return sw > 0 && sw < height * 0.35; // линии, а не заливка
+            });
+            const fillStripes = horizontal.length ? horizontal : vertical;
+            if (strokeEls.length && fillStripes.length) {
+                const pickStroke = strokeEls[Math.floor(Math.random() * strokeEls.length)];
+                const el = pickStroke.el;
+                const donor = fillStripes[Math.floor(Math.random() * fillStripes.length)];
+                const oldStroke = el.getAttribute('stroke');
+                if (oldStroke.toLowerCase() === donor.fill.toLowerCase()) return null;
+                el.setAttribute('stroke', donor.fill);
+                return { desc: 'цвет линий заменён на цвет полосы флага' };
+            }
+
+            // Многоцветные (3+): инверсия или свап двух.
+            const multi = horizontal.length >= 3 ? horizontal : (vertical.length >= 3 ? vertical : null);
+            if (multi) {
+                const colors = multi.map(s => s.fill);
+                let newColors, desc;
+                if (Math.random() < 0.5) {
+                    newColors = colors.slice().reverse();
+                    desc = 'инвертировано чередование полос';
+                } else {
+                    const i = Math.floor(Math.random() * multi.length);
+                    let j = Math.floor(Math.random() * multi.length);
+                    if (i === j) j = (j + 1) % multi.length;
+                    if (colors[i] === colors[j]) return null;
+                    newColors = colors.slice();
+                    [newColors[i], newColors[j]] = [newColors[j], newColors[i]];
+                    desc = 'переставлены цвета полос';
+                }
+                multi.forEach((s, i) => s.el.setAttribute('fill', newColors[i]));
+                return { desc };
+            }
+
+            // Двухполосные без кантона (Польша, Индонезия, Украина): просто инвертируем.
+            const duo = horizontal.length === 2 ? horizontal : (vertical.length === 2 ? vertical : null);
+            if (duo) {
+                const [a, b] = duo;
+                if (a.fill.toLowerCase() === b.fill.toLowerCase()) return null;
+                // если есть ещё элементы в углу (кантон), пропускаем — сломается композиция
+                const others = drawableElements(doc).filter(({ el, bbox }) => {
+                    const t = el.tagName.toLowerCase();
+                    return t !== 'rect' && t !== 'path' && bbox.w < width * 0.95 && bbox.h < height * 0.95;
+                });
+                if (others.length) return null;
+                a.el.setAttribute('fill', b.fill);
+                b.el.setAttribute('fill', a.fill);
+                return { desc: 'половины флага поменялись цветами' };
+            }
+
+            return null;
+        }
+
+        // Удаление элемента. Разумность:
+        // 1) предпочитаем удалить ОДИН член из группы одинаковых (звезда из дуги, луч из солнца);
+        // 2) одиночные элементы — только если они НЕ покрывают большую часть флага
+        //    (иначе удаляется всё содержимое, как солнышко Киргизии с фоном).
+        function opRemoveElement(doc, width, height) {
+            const candidates = [];
+
+            // 1) Группы из нескольких одинаковых fill (дуги звёзд, лучи, ряды элементов).
+            const groups = [...(doc.documentElement || svgRoots.get(doc)).querySelectorAll('g')].filter(g => !g.closest('defs') && g.children.length >= 2);
+            for (const g of groups) {
+                const kids = [...g.children].filter(ch => {
+                    const b = elementBBox(ch);
+                    return b && b.w < width * 0.6 && b.h < height * 0.6; // член группы — не гигант
+                });
+                const fills = new Map();
+                for (const ch of kids) {
+                    const f = (ch.getAttribute('fill') || '').toLowerCase();
+                    if (!f) continue;
+                    if (!fills.has(f)) fills.set(f, []);
+                    fills.get(f).push(ch);
+                }
+                for (const [, list] of fills) {
+                    if (list.length >= 2) {
+                        candidates.push({ el: list[Math.floor(Math.random() * list.length)], desc: 'удалён один из повторяющихся элементов' });
+                    }
+                }
+            }
+
+            // 2) Одиночная эмблема: небольшая относительно флага и не полоса-фон.
+            for (const { el, bbox } of drawableElements(doc)) {
+                const tag = el.tagName.toLowerCase();
+                if (tag === 'g' || tag === 'rect') continue;
+                const fill = (el.getAttribute('fill') || '').trim();
+                if (!/^#/.test(fill)) continue;
+                const smallEnough = bbox.w < width * 0.55 && bbox.h < height * 0.55;
+                const isStripe = bbox.w > width * 0.9 || bbox.h > height * 0.9;
+                if (smallEnough && !isStripe) {
+                    candidates.push({ el, desc: 'удалён центральный элемент' });
+                }
+            }
+
+            if (!candidates.length) return null;
+            // Предпочитаем групповые удаления — они хитрее.
+            const groupCands = candidates.filter(c => c.desc.includes('повторяющихся'));
+            const pick = (groupCands.length && Math.random() < 0.7)
+                ? groupCands[Math.floor(Math.random() * groupCands.length)]
+                : candidates[Math.floor(Math.random() * candidates.length)];
+            pick.el.remove();
+            return { desc: pick.desc };
+        }
+
+        // Масштабирование элемента вокруг его центра: 1.3–1.6x или 0.5–0.7x.
+        // Разумность: масштабируем только «детали» (не фоны и не полосы, как белый фон Израиля),
+        // и строго вокруг центра bbox — элемент остаётся на своём месте (Лесото).
+        function opScaleElement(doc, width, height) {
+            const candidates = drawableElements(doc).filter(({ el, bbox }) => {
+                const tag = el.tagName.toLowerCase();
+                if (!['path', 'polygon', 'g', 'circle', 'use', 'ellipse'].includes(tag)) return false;
+                const fill = (el.getAttribute('fill') || '').trim();
+                if (!/^#/.test(fill) && tag !== 'g' && tag !== 'use') return false;
+                // не фон: заметно меньше флага хотя бы по одной оси
+                const isBackground = bbox.w > width * 0.95 && bbox.h > height * 0.95;
+                // не полоса: не тянется через весь флаг ни по одной оси
+                const isStripe = bbox.w > width * 0.9 || bbox.h > height * 0.9;
+                return !isBackground && !isStripe;
+            });
+            if (!candidates.length) return null;
+            const { el, bbox } = candidates[Math.floor(Math.random() * candidates.length)];
+            const k = Math.random() < 0.5 ? 1.3 + Math.random() * 0.3 : 0.5 + Math.random() * 0.2;
+            const prev = el.getAttribute('transform') || '';
+            el.setAttribute('transform', prev + ` translate(${bbox.cx} ${bbox.cy}) scale(${k}) translate(${-bbox.cx} ${-bbox.cy})`);
+            return { desc: `элемент ${k > 1 ? 'увеличен' : 'уменьшен'} (×${k.toFixed(1)})` };
+        }
+
+        // Перекраска: цвет берём из мировой флаговой палитры.
+        function opRecolor(doc, svgText, palette, colors) {
+            const svgCols = svgColors(svgText);
+            if (!svgCols.length) return null;
+            const candidates = palette.filter(s => s.share >= 0.05).sort(() => Math.random() - 0.5);
+            let target = null;
+            for (const cand of candidates) {
+                let nearest = null, nd = Infinity;
+                for (const col of svgCols) {
+                    const d = Math.hypot(col[0] - cand.r, col[1] - cand.g, col[2] - cand.b);
+                    if (d < nd) { nd = d; nearest = col; }
+                }
+                if (nd < 80) { target = nearest; break; }
+            }
+            if (!target) return null;
+
+            const others = palette.filter(s => Math.hypot(s.r - target[0], s.g - target[1], s.b - target[2]) > 40);
+            const options = colors.filter(c => {
+                if (Math.hypot(c[0] - target[0], c[1] - target[1], c[2] - target[2]) < 90) return false;
+                return others.every(s => Math.hypot(c[0] - s.r, c[1] - s.g, c[2] - s.b) >= 60);
+            });
+            if (!options.length) return null;
+            const rep = options[Math.floor(Math.random() * options.length)];
+            const hex = rgbToHex(rep);
+            const targetHex = rgbToHex(target);
+            const short = '#' + targetHex[1] + targetHex[3] + targetHex[5];
+
+            const baseSvg = serializeSvg(doc) || svgText;
+            const longRe = new RegExp(targetHex, 'gi');
+            let newSvg = baseSvg.replace(longRe, hex);
+            newSvg = newSvg.replace(/(fill|stop-color|stroke)\s*=\s*"([^"]*)"/gi, (m, attr, val) => {
+                const v = val.trim();
+                if (v.toLowerCase() === targetHex.toLowerCase() || v.toLowerCase() === short.toLowerCase()) {
+                    return `${attr}="${hex}"`;
+                }
+                return m;
+            });
+            if (newSvg === baseSvg) return null;
+            return { newSvg, desc: `перекрашен цвет ${targetHex.toUpperCase()} → ${hex.toUpperCase()}` };
+        }
+
+        // ------- Конвейер: выбор оператора, применение, валидация -------
+        async function repaintFlagSVG(code, palette, colors, realPalettes, svgText) {
+            const parsed = parseSvg(svgText);
+            if (!parsed) return null;
+            const { doc, root, width, height } = parsed;
+            const origSvg = serializeSvg(doc);
+            const origPal = computePalette(await renderSvgToCanvas(origSvg));
+
+            try {
+                // Приоритет структурных операторов: свап полос чаще всего даёт «умный» фейк.
+                // Перекраска — fallback, когда структура не подходит (и всё равно с шансом 25%
+                // пробуем структурные первыми в другом порядке).
+                const structural = [
+                    () => opSwapStripes(doc, width, height),
+                    () => opRemoveElement(doc, width, height),
+                    () => opScaleElement(doc, width, height),
+                ];
+                let result = null;
+                if (Math.random() < 0.75) {
+                    // сначала случайный структурный, затем остальные, в конце — recolor
+                    structural.sort(() => Math.random() - 0.5);
+                    for (const op of structural) {
+                        result = op();
+                        if (result) break;
+                    }
+                } else {
+                    // случайный порядок, но всё равно все структурные раньше recolor
+                    structural.sort(() => Math.random() - 0.5);
+                    for (const op of structural) {
+                        result = op();
+                        if (result) break;
+                    }
+                }
+
+                let newSvg;
+                let desc;
+                let fromHex = null;
+                let toHex = null;
+                if (result) {
+                    newSvg = serializeSvg(doc);
+                    desc = result.desc;
+                } else {
+                    const rec = opRecolor(doc, origSvg, palette, colors);
+                    if (!rec) return null;
+                    newSvg = rec.newSvg;
+                    desc = rec.desc;
+                    const m = desc.match(/#([0-9a-f]{6})/gi) || [];
+                    fromHex = m[0];
+                    toHex = m[1];
+                }
+
+                // Валидация 1: фейк должен реально отличаться от оригинала.
+                const diff = await pixelDiffFraction(origSvg, newSvg);
+                if (diff < 0.02) return null;
+
+                // Валидация 1б: удаление не должно оставлять пустое полотно (Китай без звёзд).
+                // Если фейк стал почти однотонным, а оригинал — нет, изменение уничтожило флаг.
+                const cv = await renderSvgToCanvas(newSvg);
+                if (!cv) return null;
+                const newPalette = computePalette(cv);
+                const fakeDominant = newPalette.length ? Math.max(...newPalette.map(s => s.share)) : 1;
+                const origDominant = origPal.length ? Math.max(...origPal.map(s => s.share)) : 1;
+                if (fakeDominant > 0.92 && origDominant < 0.85) return null;
+
+                // Валидация 2: фейк не должен совпадать ни с одним реальным флагом.
+                const collision = realPalettes.some(rp => !palettesDiffer(newPalette, rp));
+                if (collision) return null;
+
+                return { svgDataUrl: svgToDataUrl(newSvg), canvas: cv, desc, fromHex, toHex };
+            } finally {
+                releaseSvg(); // снимаем SVG с живого DOM
+            }
+        }
+
+        // ------- Жизненный цикл раунда -------
+        // Все 100 раундов готовятся заранее (50 настоящих + 50 фейков, без повторов стран),
+        // пока игрок смотрит экран загрузки с прогрессом. Дальше раунды мгновенные.
+        let fakeDeck = null; // [{ isReal, code, url?, desc?, fromHex?, toHex? }]
+
+        async function fakeBuildDeck(onProgress) {
+            const colors = await getFlagColors();
+            const realPalettes = await getRealPalettes();
+
+            // Перемешанный список стран: каждая используется максимум один раз за забег.
+            const shuffled = shuffleArray(allCountries.slice());
+            const deck = [];
+            const used = new Set();
+            let realCount = 0;
+            const target = FAKE_ROUNDS;
+
+            // Чередуем примерно 50/50: сначала фейк, потом настоящий и т.д. Страну для фейка
+            // и для настоящего берём из одного пула — без повторов.
+            let wantFake = Math.random() < 0.5;
+            let guard = 0;
+            while (deck.length < target && guard < target * 8) {
+                guard++;
+                if (wantFake && deck.length - realCount >= Math.ceil(target / 2)) wantFake = false;
+                if (!wantFake && realCount >= Math.floor(target / 2)) wantFake = true;
+
+                const c = shuffled[(deck.length + guard) % shuffled.length];
+                if (used.has(c.code)) continue;
+
+                if (!wantFake) {
+                    used.add(c.code);
+                    realCount++;
+                    deck.push({ isReal: true, code: c.code });
+                    wantFake = !wantFake;
+                    onProgress(deck.length, target);
+                    await new Promise(r => setTimeout(r, 0)); // даём отрисоваться прогрессу
+                    continue;
+                }
+
+                // Фейк: нужны палитра и SVG страны.
+                let palette = paletteCache.get(c.code);
+                if (!palette) {
+                    palette = await new Promise(resolve => {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        img.onload = () => {
+                            try { resolve(computePalette(img)); } catch (e) { resolve(null); }
+                        };
+                        img.onerror = () => resolve(null);
+                        img.src = `https://flagcdn.com/w640/${c.code}.png`;
+                    });
+                    if (palette) paletteCache.set(c.code, palette);
+                }
+                if (!palette || !palette.length) continue;
+
+                let svgText = null;
+                try {
+                    const resp = await fetch(`https://flagcdn.com/${c.code}.svg`);
+                    if (resp.ok) svgText = await resp.text();
+                } catch (e) { /* нет SVG — другая страна */ }
+                if (!svgText) continue;
+
+                const rep = await repaintFlagSVG(c.code, palette, colors, realPalettes, svgText);
+                if (!rep) continue; // страна не подошла — пробуем следующую
+
+                used.add(c.code);
+                deck.push({
+                    isReal: false, code: c.code,
+                    url: rep.svgDataUrl, desc: rep.desc, fromHex: rep.fromHex, toHex: rep.toHex,
+                });
+                wantFake = !wantFake;
+                onProgress(deck.length, target);
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            // Если фейков не хватило (мало подходящих стран), добираем настоящими.
+            for (const c of shuffled) {
+                if (deck.length >= target) break;
+                if (used.has(c.code)) continue;
+                used.add(c.code);
+                deck.push({ isReal: true, code: c.code });
+                onProgress(deck.length, target);
+            }
+            return deck;
+        }
+
+        async function fakeStartMode() {
+            if (fakeActive) return;
+            fakeActive = true;
+            fakeRound = 0;
+            fakeScore = 0;
+            fakeErrors = 0;
+            fakeLog = [];
+
+            fakeHud.classList.add('show');
+            fakeModeBtn.classList.add('active');
+            fakeModeBtn.textContent = '🎨 Идёт игра…';
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            fakeBtnYes.classList.add('hidden');
+            fakeBtnNo.classList.add('hidden');
+            clearOptions();
+            fakeOverlay.classList.remove('show');
+
+            // Экран подготовки: флаги генерируются заранее, с прогрессом.
+            state.step = 'fake-loading';
+            showFlagSvgPrep();
+            fakeDeck = null;
+            fakeRoundEl.textContent = `0/${FAKE_ROUNDS}`;
+            const deck = await fakeBuildDeck((done, total) => {
+                fakeRoundEl.textContent = `⏳ ${done}/${total}`;
+            });
+            if (!fakeActive) return; // вышли во время подготовки
+
+            fakeDeck = deck;
+            fakeStart = performance.now();
+            fakeTick();
+            fakeTimerId = setInterval(fakeTick, 100);
+            fakeNextRound();
+        }
+
+        // Заглушка показа во время генерации: чистая зона флага.
+        function showFlagSvgPrep() {
+            flagImg.style.display = 'none';
+            flagZoom.style.display = 'none';
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+        }
+
+        function fakeTick() {
+            fakeTimerEl.textContent = fmtTime(performance.now() - fakeStart);
+        }
+
+        function fakeStopTimer() {
+            if (fakeTimerId !== null) {
+                clearInterval(fakeTimerId);
+                fakeTimerId = null;
+            }
+        }
+
+        function fakeNextRound() {
+            const card = fakeDeck && fakeDeck[fakeRound];
+            if (!card) { fakeFinish(); return; }
+            fakeRound++;
+            fakeRoundEl.textContent = fakeRound;
+            fakeScoreEl.textContent = fakeScore;
+            fakeErrorsEl.textContent = fakeErrors;
+            state.step = 'fake-question';
+
+            fakeCurrent = card.isReal
+                ? { isReal: true, code: card.code, realCode: card.code }
+                : card;
+            if (card.isReal) {
+                showFlag(card.code, true); // полный флаг, несмотря на включённые Zoom/Цвета
+            } else {
+                showFlagSvg(card.url);
+            }
+
+            btnKnow.classList.add('hidden');
+            btnDontKnow.classList.add('hidden');
+            btnMistake.classList.add('hidden');
+            btnNext.classList.add('hidden');
+            fakeBtnYes.classList.remove('hidden');
+            fakeBtnNo.classList.remove('hidden');
+            resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+        }
+
+        // Кэш палитр всех реальных флагов (для контроля коллизий).
+        let realPalettesPromise = null;
+        function getRealPalettes() {
+            if (realPalettesPromise) return realPalettesPromise;
+            realPalettesPromise = Promise.all(allCountries.map(c => new Promise(resolve => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try { resolve(computePalette(img)); } catch (e) { resolve(null); }
+                };
+                img.onerror = () => resolve(null);
+                img.src = `https://flagcdn.com/w640/${c.code}.png`;
+            }))).then(list => list.filter(Boolean));
+            return realPalettesPromise;
+        }
+
+        // Фейковый флаг — тот же img, что и у настоящих, только src — data:URL изменённого SVG.
+        // Рендер идентичен настоящим флагам до пикселя.
+        function showFlagSvg(svgDataUrl) {
+            flagZoom.style.display = 'none';
+            flagZoom.style.width = '';
+            flagImg.style.display = 'block';
+            flagImg.src = svgDataUrl;
+        }
+
+        function fakeAnswer(saidExists) {
+            if (!fakeActive || state.step !== 'fake-question' || !fakeCurrent) return;
+            const cur = fakeCurrent;
+            const correct = saidExists === cur.isReal;
+            if (correct) fakeScore++; else fakeErrors++;
+            fakeLog.push({ round: fakeRound, isReal: cur.isReal, saidExists, correct, code: cur.code });
+
+            state.step = 'fake-feedback';
+            fakeBtnYes.classList.add('hidden');
+            fakeBtnNo.classList.add('hidden');
+            fakeScoreEl.textContent = fakeScore;
+            fakeErrorsEl.textContent = fakeErrors;
+
+            resultBox.classList.add('show');
+            resultBox.classList.remove('correct', 'wrong', 'skip', 'dontknow');
+            resultBox.classList.add(correct ? 'correct' : 'wrong');
+            resultMsg.textContent = correct ? 'Правильно!' : 'Ошибка!';
+            const base = allCountries.find(c => c.code === cur.code);
+            resultDetails.innerHTML = cur.isReal
+                ? `Это настоящий флаг (<strong>${base.name}</strong>)`
+                : `Такого флага <strong>не существует</strong> — за основу взят флаг <strong>${base.name}</strong>` +
+                  `<div style="font-size:0.85rem; margin-top:4px;">Что изменено: <strong>${cur.desc || 'перекраска'}</strong>` +
+                  (cur.fromHex && cur.toHex
+                    ? ` — <span class="chip" style="display:inline-block; width:12px; height:12px; vertical-align:-2px; border-radius:3px; border:1px solid rgba(0,0,0,.25); background:${cur.fromHex}"></span> ${cur.fromHex.toUpperCase()}` +
+                      ` → <span class="chip" style="display:inline-block; width:12px; height:12px; vertical-align:-2px; border-radius:3px; border:1px solid rgba(0,0,0,.25); background:${cur.toHex}"></span> ${cur.toHex.toUpperCase()}`
+                    : '') +
+                  `</div>` +
+                  `<div style="display:flex; gap:16px; justify-content:center; margin-top:8px; align-items:center;">` +
+                  `<div><div style="font-size:0.72rem; color:#64748b; margin-bottom:2px;">показан (фейк)</div>` +
+                  `<img src="${cur.url}" style="width:180px; border-radius:8px; border:2px solid #c4593c;"></div>` +
+                  `<div><div style="font-size:0.72rem; color:#64748b; margin-bottom:2px;">${base.name} (настоящий)</div>` +
+                  `<img src="https://flagcdn.com/${cur.code}.svg" style="width:180px; border-radius:8px; border:2px solid #16a34a;"></div>` +
+                  `</div>`;
+
+            btnNext.classList.remove('hidden');
+            btnNext.textContent = fakeRound >= FAKE_ROUNDS ? '🏁 Результат' : '➡️ Далее';
+        }
+
+        function fakeNext() {
+            if (fakeRound >= FAKE_ROUNDS) {
+                fakeFinish();
+            } else {
+                fakeNextRound();
+            }
+        }
+
+        function fakeFinish() {
+            fakeActive = false;
+            fakeStopTimer();
+            const time = performance.now() - fakeStart;
+
+            fakeFinalScoreEl.textContent = fakeScore;
+            fakeFinalTimeEl.textContent = fmtTime(time);
+            fakeFinalSubEl.textContent = `Ошибок: ${fakeErrors} · Время на раунд: ${(time / FAKE_ROUNDS / 1000).toFixed(1)} с`;
+
+            const mistakes = fakeLog.filter(l => !l.correct);
+            fakeMistakesEl.innerHTML = mistakes.length
+                ? `<div class="round-block"><div class="round-title">Ошибки (${mistakes.length})</div><div class="round-flags">${
+                    mistakes.map(m => `<img class="flag-ico" src="https://flagcdn.com/w40/${m.code}.png" title="${
+                        allCountries.find(c => c.code === m.code).name
+                    } — ${m.isReal ? 'существовал' : 'был фейком'}" loading="lazy">`).join('')
+                }</div></div>`
+                : '<div class="round-block"><div class="round-title">Без ошибок! 🎉</div></div>';
+
+            try {
+                const hist = JSON.parse(localStorage.getItem(FAKE_STORAGE_HISTORY) || '[]');
+                hist.push({ date: new Date().toISOString(), score: fakeScore, errors: fakeErrors, timeMs: Math.round(time) });
+                localStorage.setItem(FAKE_STORAGE_HISTORY, JSON.stringify(hist.slice(-50)));
+            } catch (e) { /* приватный режим */ }
+
+            fakeHud.classList.remove('show');
+            fakeOverlay.classList.add('show');
+        }
+
+        function fakeExitMode(showResults) {
+            if (!fakeActive) return;
+            fakeActive = false;
+            fakeStopTimer();
+            fakeHud.classList.remove('show');
+            fakeModeBtn.classList.remove('active');
+            fakeModeBtn.textContent = '🎨 Фейк?';
+            restoreNormalMode();
+        }
+
+        function fakeCloseResults() {
+            fakeOverlay.classList.remove('show');
+            restoreNormalMode();
         }
 
         document.addEventListener('DOMContentLoaded', init);
