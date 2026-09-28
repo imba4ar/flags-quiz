@@ -464,6 +464,30 @@
             line-height: 1.45;
         }
 
+        /* Подсказка с кодом цвета при наведении на сектор пайчарта. */
+        #pieRgbTip {
+            display: none;
+            position: fixed;
+            z-index: 1100;
+            pointer-events: none;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #fdfbf5;
+            background: rgba(15, 23, 42, 0.92);
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        #pieRgbTip .chip {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-right: 5px;
+            vertical-align: -1px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 2px;
+        }
+
         /* Забег на время: страна уже отгадана в этом забеге и в списке нужна только как помеха. */
         .options-grid button.done {
             position: relative;
@@ -849,11 +873,12 @@
 </head>
 <body>
     <div id="changelogHover">
-        <div class="ver">0.24 — Новое</div>
+        <div class="ver">1.1.0 — Новое</div>
         <ul>
             <li>Тумблер показа процентов на пайчарте</li>
+            <li>Подсказка RGB/HEX при наведении на сектор пайчарта</li>
         </ul>
-        <div class="ver">0.23 — Пайчарт</div>
+        <div class="ver">1.0.0 — Пайчарт</div>
         <ul>
             <li>Пайчарт при наведении на страну в режиме «Флаги + Цвета»</li>
             <li>Проценты цветов прямо на пайчарте, с выносками для мелких долей</li>
@@ -886,7 +911,7 @@
 
             <div class="version-corner">
                 <span id="newVersionLabel" class="hidden">Новая версия</span>
-                <span id="versionBadge">v0.24</span>
+                <span id="versionBadge">v1.1.0</span>
             </div>
 
             <div class="right-actions">
@@ -936,6 +961,8 @@
                 <canvas id="pieHoverCanvas"></canvas>
                 <div id="pieHoverLegend"></div>
             </div>
+
+            <div id="pieRgbTip"></div>
     </div>
 
     <script>
@@ -1571,6 +1598,9 @@
             const fontSize = Math.round(size * 0.075);
             let angle = -Math.PI / 2;
 
+            // Геометрия и палитра — для хит-теста в подсказке с кодом цвета.
+            canvas._pie = { palette, cx, cy, radius, startAngle: angle };
+
             const outerLabels = []; // выносные подписи мелких секторов
 
             palette.forEach(slice => {
@@ -1947,6 +1977,64 @@
         }
 
         // --------------------------------------------------------------
+        // Подсказка с кодом цвета: наведение на сектор любого пайчарта (главного
+        // или в карточке) показывает RGB и HEX этого цвета. Хит-тест — по геометрии,
+        // сохранённой в canvas._pie при отрисовке.
+        // --------------------------------------------------------------
+        const pieRgbTip = document.getElementById('pieRgbTip');
+
+        function pieSliceAt(canvas, mx, my) {
+            const pie = canvas._pie;
+            if (!pie) return null;
+            const dx = mx - pie.cx;
+            const dy = my - pie.cy;
+            const dist = Math.hypot(dx, dy);
+            if (dist > pie.radius) return null;
+            // Угол в тех же координатах, что и при отрисовке (0 = вправо, по часовой).
+            let a = Math.atan2(dy, dx);
+            if (a < -Math.PI / 2) a += Math.PI * 2;
+            let angle = pie.startAngle;
+            for (const slice of pie.palette) {
+                const sweep = slice.share * Math.PI * 2;
+                if (a >= angle && a <= angle + sweep) return slice;
+                angle += sweep;
+            }
+            return null;
+        }
+
+        function handlePieMouseMove(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            // Canvas растянут CSS — пересчитываем координаты во внутренние пиксели.
+            const mx = (e.clientX - rect.left) * (e.currentTarget.width / rect.width);
+            const my = (e.clientY - rect.top) * (e.currentTarget.height / rect.height);
+            const slice = pieSliceAt(e.currentTarget, mx, my);
+            if (!slice) {
+                pieRgbTip.style.display = 'none';
+                return;
+            }
+            const hex = `#${[slice.r, slice.g, slice.b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+            pieRgbTip.innerHTML = `<span class="chip" style="background:${hex}"></span>` +
+                `rgb(${slice.r}, ${slice.g}, ${slice.b}) · ${hex.toUpperCase()}`;
+            pieRgbTip.style.display = 'block';
+            const tw = pieRgbTip.offsetWidth;
+            let x = e.clientX + 14;
+            if (x + tw > window.innerWidth - 8) {
+                x = e.clientX - tw - 14;
+            }
+            pieRgbTip.style.left = `${x}px`;
+            pieRgbTip.style.top = `${e.clientY - 10}px`;
+        }
+
+        function handlePieMouseLeave() {
+            pieRgbTip.style.display = 'none';
+        }
+
+        [flagZoom, pieHoverCanvas].forEach(c => {
+            c.addEventListener('mousemove', handlePieMouseMove);
+            c.addEventListener('mouseleave', handlePieMouseLeave);
+        });
+
+        // --------------------------------------------------------------
         // Версия и чейнжлог: окно появляется при наведении на бейдж версии.
         // Если версия новая (игрок ещё не рассматривал её 2 секунды), слева от бейджа
         // горит метка «Новая версия». Посмотрел — метка гаснет до следующего обновления.
@@ -1954,7 +2042,7 @@
         const versionBadge = document.getElementById('versionBadge');
         const changelogHover = document.getElementById('changelogHover');
         const newVersionLabel = document.getElementById('newVersionLabel');
-        const APP_VERSION = '0.24';
+        const APP_VERSION = '1.1.0';
         const SEEN_VERSION_KEY = 'seenVersion';
 
         try {
