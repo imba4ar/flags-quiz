@@ -187,16 +187,13 @@
         }
         .flag-area span {
             pointer-events: none;
+        }        /* Анимируемое кастомное свойство — радиальное заполнение рамки версии. */
+        @property --read-progress {
+            syntax: '<percentage>';
+            inherits: false;
+            initial-value: 0%;
         }
 
-        .right-actions {
-            display: flex;
-            gap: 8px;
-            flex-shrink: 0;
-            z-index: 1;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
         .right-actions button {
             padding: 6px 16px;
             border: none;
@@ -342,6 +339,129 @@
         .options-grid button.flag-mode:hover {
             border-color: white;
             box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Плавающая карточка с пайчартом страны — при наведении на кнопку-флаг. */
+        #pieHover {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            pointer-events: none;
+            background: #fdfbf5;
+            border: 2px solid rgba(197, 168, 110, 0.6);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        }
+        #pieHover canvas {
+            display: block;
+            width: 200px;
+            height: 200px;
+        }
+        #pieHoverLegend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px 10px;
+            margin-top: 6px;
+            max-width: 210px;
+        }
+        #pieHoverLegend .sw {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #334155;
+        }
+        #pieHoverLegend .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        /* Кнопка версии и её окошко с чейнжлогом. */
+        /* Бейдж версии живёт в top-bar рядом с остальными кнопками. Рамка — прогресс
+           «прочтения» чейнжлога: при наведении радиально заполняется зелёным (conic-gradient). */
+        /* Бейдж версии: правый верхний угол top-bar. Рамка — прогресс «прочтения»
+           чейнжлога: при наведении радиально заполняется зелёным (conic-gradient). */
+        .version-corner {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #versionBadge {
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #64748b;
+            background:
+                linear-gradient(#fdfbf5, #fdfbf5) padding-box,
+                conic-gradient(#16a34a var(--read-progress, 0%), rgba(197, 168, 110, 0.6) 0) border-box;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: default;
+            user-select: none;
+            transition: --read-progress 2s linear;
+        }
+        #versionBadge:hover {
+            --read-progress: 100%;
+        }
+        /* Метка «Новая версия» слева от бейджа — видна, пока игрок не рассмотрит чейнжлог. */
+        #newVersionLabel {
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #0b4a5c;
+            background: #e9b949;
+            /* Прозрачная рамка — той же толщины, что у бейджа версии, чтобы высоты совпадали. */
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: default;
+            user-select: none;
+            animation: newVerPulse 1.6s ease-in-out infinite;
+        }
+        #newVersionLabel.hidden {
+            display: none;
+        }
+        /* Пульс сильнее, чтобы метка заметно «сигналила». */
+        @keyframes newVerPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.14); }
+        }
+        #changelogHover {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            width: 300px;
+            max-height: min(70vh, 520px);
+            overflow-y: auto;
+            pointer-events: none;
+            background: #fdfbf5;
+            border: 2px solid rgba(197, 168, 110, 0.6);
+            border-radius: 12px;
+            padding: 12px 14px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        }
+        #changelogHover .ver {
+            font-weight: 700;
+            color: #0b4a5c;
+            margin-top: 8px;
+        }
+        #changelogHover .ver:first-child {
+            margin-top: 0;
+        }
+        #changelogHover ul {
+            margin: 4px 0 0;
+            padding-left: 18px;
+        }
+        #changelogHover li {
+            font-size: 0.8rem;
+            color: #334155;
+            line-height: 1.45;
         }
 
         /* Забег на время: страна уже отгадана в этом забеге и в списке нужна только как помеха. */
@@ -728,6 +848,19 @@
     </style>
 </head>
 <body>
+    <div id="changelogHover">
+        <div class="ver">0.23 — Новое</div>
+        <ul>
+            <li>Пайчарт при наведении на страну в режиме «Флаги + Цвета»</li>
+            <li>Проценты цветов прямо на пайчарте, с выносками для мелких долей</li>
+            <li>Точность процентов до десятых</li>
+        </ul>
+        <div class="ver">0.22 — Забег на время</div>
+        <ul>
+            <li>Режим забега: круги, секундомер, ошибки</li>
+            <li>Финальная статистика и история забегов</li>
+        </ul>
+    </div>
     <div class="container">
         <div class="top-bar">
             <div class="left-section">
@@ -744,6 +877,11 @@
                 <img id="flagImage" src="" alt="Флаг" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
                 <span style="display:none; color:#94a3b8; font-size:0.8rem;">нет флага</span>
                 <canvas id="flagZoom" style="display:none"></canvas>
+            </div>
+
+            <div class="version-corner">
+                <span id="newVersionLabel" class="hidden">Новая версия</span>
+                <span id="versionBadge">v0.23</span>
             </div>
 
             <div class="right-actions">
@@ -787,8 +925,12 @@
                     <button id="historyClear">🗑 Очистить всё</button>
                 </div>
             </div>
-        </div>
-        <div class="options-grid" id="optionsContainer"></div>
+        </div>            <div class="options-grid" id="optionsContainer"></div>
+
+            <div id="pieHover">
+                <canvas id="pieHoverCanvas"></canvas>
+                <div id="pieHoverLegend"></div>
+            </div>
     </div>
 
     <script>
@@ -1406,18 +1548,21 @@
             return Math.hypot(a.r + t * vx - c.r, a.g + t * vy - c.g, a.b + t * vz - c.b);
         }
 
-        function drawPalettePie(palette) {
-            const size = 440;
-            flagZoom.classList.add('pie');
-            flagZoom.width = size;
-            flagZoom.height = size;
-            const ctx = flagZoom.getContext('2d');
+        function drawPieOnCanvas(canvas, size, palette) {
+            canvas.classList.add('pie');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, size, size);
 
             const cx = size / 2;
             const cy = size / 2;
-            const radius = size * 0.45;
+            // Круг чуть меньше canvas: снаружи остаётся пояс под вынесенные числа мелких секторов.
+            const radius = size * 0.34;
+            const fontSize = Math.round(size * 0.075);
             let angle = -Math.PI / 2;
+
+            const outerLabels = []; // выносные подписи мелких секторов
 
             palette.forEach(slice => {
                 const sweep = slice.share * Math.PI * 2;
@@ -1431,8 +1576,77 @@
                 ctx.strokeStyle = 'rgba(30, 41, 59, 0.35)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+
+                // Крупные секторы подписываем внутри, у края; мелкие — снаружи, с линией-выноской.
+                // Шрифт и размер у всех одинаковые — без символа %, и так понятно, что это доли.
+                const mid = angle + sweep / 2;
+                const lum = 0.299 * slice.r + 0.587 * slice.g + 0.114 * slice.b;
+                const label = (slice.share * 100).toFixed(1);
+                ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
+                ctx.textBaseline = 'middle';
+                if (slice.share >= 0.05) {
+                    ctx.fillStyle = lum > 150 ? '#1e293b' : '#ffffff';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(label,
+                        cx + Math.cos(mid) * radius * 0.75,
+                        cy + Math.sin(mid) * radius * 0.75);
+                } else {
+                    // Позицию считаем после сбора всех мелких секторов: каждое число будет
+                    // стоять на луче из центра через середину своего сектора.
+                    outerLabels.push({ label, mid });
+                }
+
                 angle += sweep;
             });
+
+            // Мелкие секторы: число ставим на луче из центра через середину сектора. Начинаем
+            // от края круга и, если место занято соседним числом, отодвигаемся дальше по тому
+            // же лучу — число всегда «смотрит» точно на свой сектор.
+            const pad = 4;
+            const halfH = fontSize / 2;
+            const placed = [];
+            outerLabels.forEach(l => {
+                const w = ctx.measureText(l.label).width;
+                let d = radius + size * 0.035;
+                let x = 0, y = 0, prevX = -1, prevY = -1;
+                for (let iter = 0; iter < 60; iter++) {
+                    x = cx + Math.cos(l.mid) * d;
+                    y = cy + Math.sin(l.mid) * d;
+                    // число не должно вылезать за край canvas
+                    x = Math.max(w / 2 + 2, Math.min(x, size - w / 2 - 2));
+                    y = Math.max(halfH + 2, Math.min(y, size - halfH - 2));
+                    if (x === prevX && y === prevY) break; // прижато к краю — дальше некуда
+                    prevX = x; prevY = y;
+                    const clash = placed.some(p =>
+                        Math.abs(x - p.x) < (w + p.w) / 2 + pad &&
+                        Math.abs(y - p.y) < fontSize + pad);
+                    if (!clash) break;
+                    d += fontSize * 0.9;
+                }
+                placed.push({ x, y, w });
+                l.x = x;
+                l.y = y;
+            });
+
+            outerLabels.forEach(l => {
+                // Выноска — прямая радиальная линия от края сектора к числу.
+                const lineEnd = Math.max(radius + 2,
+                    Math.hypot(l.x - cx, l.y - cy) - fontSize * 0.6);
+                ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(l.mid) * radius, cy + Math.sin(l.mid) * radius);
+                ctx.lineTo(cx + Math.cos(l.mid) * lineEnd, cy + Math.sin(l.mid) * lineEnd);
+                ctx.stroke();
+
+                ctx.fillStyle = '#1e293b';
+                ctx.textAlign = 'center';
+                ctx.fillText(l.label, l.x, l.y);
+            });
+        }
+
+        function drawPalettePie(palette) {
+            drawPieOnCanvas(flagZoom, 480, palette);
         }
 
         function drawZoomCrop(img, crop) {
@@ -1580,6 +1794,22 @@
             if (state.currentCountry) {
                 showFlag(state.currentCountry.code, state.step === 'result');
             }
+
+            // Включение/выключение «Цветов» добавляет или убирает наведение-пайчарт на кнопках-флагах.
+            if (flagsOn && state.step === 'country') {
+                if (speedActive) {
+                    renderSpeedCountryOptions();
+                } else {
+                    clearOptions();
+                    sortedCountries.forEach(country => {
+                        optionsContainer.appendChild(createOptionButton(
+                            country.name,
+                            () => onCountrySelect(country),
+                            country.code
+                        ));
+                    });
+                }
+            }
         }
 
         // Уровень и включённость живут отдельно: уровень переживает любое выключение.
@@ -1596,6 +1826,7 @@
 
         function clearOptions() {
             optionsContainer.innerHTML = '';
+            hidePieHover();
         }
 
         function createOptionButton(text, clickHandler, countryCode = null) {
@@ -1612,7 +1843,136 @@
                 btn.style.backgroundImage = '';
             }
             btn.addEventListener('click', clickHandler);
+            if (flagsOn && countryCode && pieOn) {
+                btn.addEventListener('mouseenter', () => showPieHover(btn, countryCode));
+                btn.addEventListener('mouseleave', hidePieHover);
+            }
             return btn;
+        }
+
+        // --------------------------------------------------------------
+        // Пайчарт при наведении: во флаговом режиме списка стран (Флаги + Цвета) карточка
+        // с диаграммой и легендой процентов всплывает рядом с кнопкой. Палитра берётся
+        // из кэша, а если её ещё нет — флаг грузится и считается на месте.
+        // --------------------------------------------------------------
+        const pieHover = document.getElementById('pieHover');
+        const pieHoverCanvas = document.getElementById('pieHoverCanvas');
+        const pieHoverLegend = document.getElementById('pieHoverLegend');
+        let pieHoverLoadToken = 0;
+
+        function showPieHover(btn, code) {
+            const palette = paletteCache.get(code);
+            if (palette) {
+                renderPieHover(palette);
+            } else {
+                const token = ++pieHoverLoadToken;
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    if (token !== pieHoverLoadToken) return;
+                    try {
+                        const pal = computePalette(img);
+                        paletteCache.set(code, pal);
+                        if (btn.matches(':hover')) {
+                            renderPieHover(pal);
+                            positionPieHover(btn);
+                        }
+                    } catch (e) {
+                        // canvas «загрязнён» — карточку не показываем
+                    }
+                };
+                img.src = `https://flagcdn.com/w640/${code}.png`;
+            }
+
+            pieHover.style.display = 'block';
+            positionPieHover(btn);
+        }
+
+        function renderPieHover(palette) {
+            // Тот же внутренний размер, что у главного пая: отрисовка один в один, CSS только масштабирует.
+            drawPieOnCanvas(pieHoverCanvas, 480, palette);
+            pieHoverLegend.innerHTML = palette.map(slice => {
+                const r = slice.r.toString(16).padStart(2, '0');
+                const g = slice.g.toString(16).padStart(2, '0');
+                const b = slice.b.toString(16).padStart(2, '0');
+                const pct = (slice.share * 100).toFixed(1);
+                return `<span class="sw"><span class="dot" style="background:#${r}${g}${b}"></span>${pct}%</span>`;
+            }).join('');
+        }
+
+        // Держим карточку у кнопки, но в пределах окна.
+        function positionPieHover(btn) {
+            const r = btn.getBoundingClientRect();
+            pieHover.style.left = '0px';
+            pieHover.style.top = '0px';
+            const w = pieHover.offsetWidth;
+            const h = pieHover.offsetHeight;
+            let x = r.right + 8;
+            let y = r.top + r.height / 2 - h / 2;
+            if (x + w > window.innerWidth - 8) {
+                x = Math.max(8, r.left - w - 8);
+            }
+            y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
+            pieHover.style.left = `${x}px`;
+            pieHover.style.top = `${y}px`;
+        }
+
+        function hidePieHover() {
+            pieHoverLoadToken++;
+            pieHover.style.display = 'none';
+        }
+
+        // --------------------------------------------------------------
+        // Версия и чейнжлог: окно появляется при наведении на бейдж версии.
+        // Если версия новая (игрок ещё не рассматривал её 2 секунды), слева от бейджа
+        // горит метка «Новая версия». Посмотрел — метка гаснет до следующего обновления.
+        // --------------------------------------------------------------
+        const versionBadge = document.getElementById('versionBadge');
+        const changelogHover = document.getElementById('changelogHover');
+        const newVersionLabel = document.getElementById('newVersionLabel');
+        const APP_VERSION = '0.23';
+        const SEEN_VERSION_KEY = 'seenVersion';
+
+        try {
+            if (localStorage.getItem(SEEN_VERSION_KEY) !== APP_VERSION) {
+                newVersionLabel.classList.remove('hidden');
+            }
+        } catch (e) {
+            // приватный режим — метку не показываем
+        }
+
+        let seenTimer = null;
+
+        versionBadge.addEventListener('mouseenter', () => {
+            // Окошко чейнжлога пристыковываем под бейджем, где бы тот ни стоял,
+            // и не даём ему вылезти за края окна.
+            const r = versionBadge.getBoundingClientRect();
+            changelogHover.style.top = `${r.bottom + 8}px`;
+            changelogHover.style.right = 'auto';
+            changelogHover.style.left = 'auto';
+            changelogHover.style.display = 'block';
+            let right = window.innerWidth - r.right;
+            const w = changelogHover.offsetWidth;
+            if (r.right - w < 8) {
+                right = Math.max(8, window.innerWidth - w - 8);
+            }
+            changelogHover.style.right = `${right}px`;
+            seenTimer = setTimeout(() => {
+                try {
+                    localStorage.setItem(SEEN_VERSION_KEY, APP_VERSION);
+                } catch (e) {
+                    // приватный режим — просто не запоминаем
+                }
+                newVersionLabel.classList.add('hidden');
+            }, 2000);
+        });
+        versionBadge.addEventListener('mouseleave', () => {
+            clearTimeout(seenTimer);
+            hideChangelogHover();
+        });
+
+        function hideChangelogHover() {
+            changelogHover.style.display = 'none';
         }
 
         function renderCountryStep() {
