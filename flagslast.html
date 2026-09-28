@@ -849,7 +849,11 @@
 </head>
 <body>
     <div id="changelogHover">
-        <div class="ver">0.23 — Новое</div>
+        <div class="ver">0.24 — Новое</div>
+        <ul>
+            <li>Тумблер показа процентов на пайчарте</li>
+        </ul>
+        <div class="ver">0.23 — Пайчарт</div>
         <ul>
             <li>Пайчарт при наведении на страну в режиме «Флаги + Цвета»</li>
             <li>Проценты цветов прямо на пайчарте, с выносками для мелких долей</li>
@@ -870,6 +874,7 @@
                     <button id="toggleFlags" class="toggle-flags">🏳️ Флаги</button>
                     <button id="toggleZoom" class="toggle-flags" title="Показывать только фрагмент флага">🔍 Zoom</button>
                     <button id="togglePie" class="toggle-flags" title="Показывать только доли цветов флага">🥧 Цвета</button>
+                    <button id="togglePieLabels" class="toggle-flags" title="Показывать проценты на пайчарте">#%</button>
                 </div>
             </div>
 
@@ -881,7 +886,7 @@
 
             <div class="version-corner">
                 <span id="newVersionLabel" class="hidden">Новая версия</span>
-                <span id="versionBadge">v0.23</span>
+                <span id="versionBadge">v0.24</span>
             </div>
 
             <div class="right-actions">
@@ -1249,17 +1254,21 @@
         const toggleFlagsBtn = document.getElementById('toggleFlags');
         const toggleZoomBtn = document.getElementById('toggleZoom');
         const togglePieBtn = document.getElementById('togglePie');
+        const togglePieLabelsBtn = document.getElementById('togglePieLabels');
         const flagZoom = document.getElementById('flagZoom');
 
         let flagsOn = false;
         let zoomOn = false;
         let zoomLevel = 'medium';
         let pieOn = false;
+        // Подписи процентов на пайчарте — отдельный тумблер, по умолчанию включены.
+        let pieLabelsOn = true;
         // Порядок включения: последний в списке и показывается.
         let modeStack = [];
         const ZOOM_STORAGE_KEY = 'flagZoomLevel';
         const ZOOM_ON_STORAGE_KEY = 'flagZoomOn';
         const PIE_STORAGE_KEY = 'flagPieMode';
+        const PIE_LABELS_STORAGE_KEY = 'flagPieLabels';
         const MODE_STACK_STORAGE_KEY = 'flagModeStack';
 
         // --------------------------------------------------------------
@@ -1548,7 +1557,7 @@
             return Math.hypot(a.r + t * vx - c.r, a.g + t * vy - c.g, a.b + t * vz - c.b);
         }
 
-        function drawPieOnCanvas(canvas, size, palette) {
+        function drawPieOnCanvas(canvas, size, palette, withLabels = pieLabelsOn) {
             canvas.classList.add('pie');
             canvas.width = size;
             canvas.height = size;
@@ -1580,20 +1589,22 @@
                 // Крупные секторы подписываем внутри, у края; мелкие — снаружи, с линией-выноской.
                 // Шрифт и размер у всех одинаковые — без символа %, и так понятно, что это доли.
                 const mid = angle + sweep / 2;
-                const lum = 0.299 * slice.r + 0.587 * slice.g + 0.114 * slice.b;
-                const label = (slice.share * 100).toFixed(1);
-                ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
-                ctx.textBaseline = 'middle';
-                if (slice.share >= 0.05) {
-                    ctx.fillStyle = lum > 150 ? '#1e293b' : '#ffffff';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(label,
-                        cx + Math.cos(mid) * radius * 0.75,
-                        cy + Math.sin(mid) * radius * 0.75);
-                } else {
-                    // Позицию считаем после сбора всех мелких секторов: каждое число будет
-                    // стоять на луче из центра через середину своего сектора.
-                    outerLabels.push({ label, mid });
+                if (withLabels) {
+                    const lum = 0.299 * slice.r + 0.587 * slice.g + 0.114 * slice.b;
+                    const label = (slice.share * 100).toFixed(1);
+                    ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
+                    ctx.textBaseline = 'middle';
+                    if (slice.share >= 0.05) {
+                        ctx.fillStyle = lum > 150 ? '#1e293b' : '#ffffff';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(label,
+                            cx + Math.cos(mid) * radius * 0.75,
+                            cy + Math.sin(mid) * radius * 0.75);
+                    } else {
+                        // Позицию считаем после сбора всех мелких секторов: каждое число будет
+                        // стоять на луче из центра через середину своего сектора.
+                        outerLabels.push({ label, mid });
+                    }
                 }
 
                 angle += sweep;
@@ -1736,6 +1747,17 @@
 
             togglePieBtn.classList.toggle('active', shown === 'pie');
             togglePieBtn.classList.toggle('armed', pieOn && shown !== 'pie');
+            togglePieLabelsBtn.classList.toggle('active', pieLabelsOn);
+        }
+
+        // Проценты на пае — отдельный тумблер: касается и главного пая, и карточки наведения.
+        function togglePieLabels() {
+            pieLabelsOn = !pieLabelsOn;
+            persistDisplayMode();
+
+            if (state.currentCountry && shownMode() === 'pie' && state.step !== 'result') {
+                showFlag(state.currentCountry.code);
+            }
         }
 
         /// <summary>Что видно сейчас: последний включённый режим, а если ничего не включено — сам флаг.</summary>
@@ -1818,6 +1840,7 @@
                 localStorage.setItem(ZOOM_STORAGE_KEY, zoomLevel);
                 localStorage.setItem(ZOOM_ON_STORAGE_KEY, zoomOn ? '1' : '0');
                 localStorage.setItem(PIE_STORAGE_KEY, pieOn ? '1' : '0');
+                localStorage.setItem(PIE_LABELS_STORAGE_KEY, pieLabelsOn ? '1' : '0');
                 localStorage.setItem(MODE_STACK_STORAGE_KEY, modeStack.join(','));
             } catch (e) {
                 // приватный режим — просто не запоминаем
@@ -1891,13 +1914,14 @@
         function renderPieHover(palette) {
             // Тот же внутренний размер, что у главного пая: отрисовка один в один, CSS только масштабирует.
             drawPieOnCanvas(pieHoverCanvas, 480, palette);
-            pieHoverLegend.innerHTML = palette.map(slice => {
+            // Легенда — те же проценты, что и на пае: выключены тумблером вместе с ним.
+            pieHoverLegend.innerHTML = pieLabelsOn ? palette.map(slice => {
                 const r = slice.r.toString(16).padStart(2, '0');
                 const g = slice.g.toString(16).padStart(2, '0');
                 const b = slice.b.toString(16).padStart(2, '0');
                 const pct = (slice.share * 100).toFixed(1);
                 return `<span class="sw"><span class="dot" style="background:#${r}${g}${b}"></span>${pct}%</span>`;
-            }).join('');
+            }).join('') : '';
         }
 
         // Держим карточку у кнопки, но в пределах окна.
@@ -1930,7 +1954,7 @@
         const versionBadge = document.getElementById('versionBadge');
         const changelogHover = document.getElementById('changelogHover');
         const newVersionLabel = document.getElementById('newVersionLabel');
-        const APP_VERSION = '0.23';
+        const APP_VERSION = '0.24';
         const SEEN_VERSION_KEY = 'seenVersion';
 
         try {
@@ -2654,6 +2678,7 @@
             toggleFlagsBtn.addEventListener('click', toggleFlags);
             toggleZoomBtn.addEventListener('click', toggleZoom);
             togglePieBtn.addEventListener('click', togglePie);
+            togglePieLabelsBtn.addEventListener('click', togglePieLabels);
 
             try {
                 const savedLevel = localStorage.getItem(ZOOM_STORAGE_KEY);
@@ -2663,6 +2688,7 @@
 
                 zoomOn = localStorage.getItem(ZOOM_ON_STORAGE_KEY) === '1';
                 pieOn = localStorage.getItem(PIE_STORAGE_KEY) === '1';
+                pieLabelsOn = localStorage.getItem(PIE_LABELS_STORAGE_KEY) !== '0';
                 modeStack = (localStorage.getItem(MODE_STACK_STORAGE_KEY) ?? '')
                     .split(',')
                     .filter(m => m === 'zoom' || m === 'pie');
