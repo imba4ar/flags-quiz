@@ -875,7 +875,11 @@
 </head>
 <body>
     <div id="changelogHover">
-        <div class="ver">1.2.1-beta — Новое</div>
+        <div class="ver">1.2.2-beta — Новое</div>
+        <ul>
+            <li>Фейков 40–60 случайно, порядок перемешан — без чередования правильных/неправильных</li>
+        </ul>
+        <div class="ver">1.2.1-beta — Умные фейки</div>
         <ul>
             <li>Умный генератор фейков: свап/инверсия полос, удаление и масштабирование элементов</li>
             <li>Перекраска теперь запасной оператор, а не основной</li>
@@ -928,7 +932,7 @@
 
             <div class="version-corner">
                 <span id="newVersionLabel" class="hidden">Новая версия</span>
-                <span id="versionBadge">v1.2.1-beta</span>
+                <span id="versionBadge">v1.2.2-beta</span>
             </div>
 
             <div class="right-actions">
@@ -2088,7 +2092,7 @@
         const versionBadge = document.getElementById('versionBadge');
         const changelogHover = document.getElementById('changelogHover');
         const newVersionLabel = document.getElementById('newVersionLabel');
-        const APP_VERSION = '1.2.1-beta';
+        const APP_VERSION = '1.2.2-beta';
         const SEEN_VERSION_KEY = 'seenVersion';
 
         try {
@@ -3427,8 +3431,9 @@
         }
 
         // ------- Жизненный цикл раунда -------
-        // Все 100 раундов готовятся заранее (50 настоящих + 50 фейков, без повторов стран),
-        // пока игрок смотрит экран загрузки с прогрессом. Дальше раунды мгновенные.
+        // Все 100 раундов готовятся заранее: фейков 40–60 (случайно), остальные настоящие.
+        // Порядок перемешивается — не чередуется. Без повторов стран. Пока игрок смотрит
+        // экран загрузки с прогрессом. Дальше раунды мгновенные.
         let fakeDeck = null; // [{ isReal, code, url?, desc?, fromHex?, toHex? }]
 
         async function fakeBuildDeck(onProgress) {
@@ -3437,34 +3442,20 @@
 
             // Перемешанный список стран: каждая используется максимум один раз за забег.
             const shuffled = shuffleArray(allCountries.slice());
-            const deck = [];
-            const used = new Set();
-            let realCount = 0;
             const target = FAKE_ROUNDS;
+            // Фейков от 40 до 60 случайно.
+            const fakeTarget = 40 + Math.floor(Math.random() * 21);
 
-            // Чередуем примерно 50/50: сначала фейк, потом настоящий и т.д. Страну для фейка
-            // и для настоящего берём из одного пула — без повторов.
-            let wantFake = Math.random() < 0.5;
-            let guard = 0;
-            while (deck.length < target && guard < target * 8) {
-                guard++;
-                if (wantFake && deck.length - realCount >= Math.ceil(target / 2)) wantFake = false;
-                if (!wantFake && realCount >= Math.floor(target / 2)) wantFake = true;
+            // Сначала готовим фейки (сколько получится), затем добираем настоящими до 100,
+            // затем всё перемешиваем — так порядок никогда не чередуется по шаблону.
+            const fakeCards = [];
+            const realCards = [];
+            const used = new Set();
 
-                const c = shuffled[(deck.length + guard) % shuffled.length];
+            for (const c of shuffled) {
+                if (fakeCards.length >= fakeTarget) break;
                 if (used.has(c.code)) continue;
 
-                if (!wantFake) {
-                    used.add(c.code);
-                    realCount++;
-                    deck.push({ isReal: true, code: c.code });
-                    wantFake = !wantFake;
-                    onProgress(deck.length, target);
-                    await new Promise(r => setTimeout(r, 0)); // даём отрисоваться прогрессу
-                    continue;
-                }
-
-                // Фейк: нужны палитра и SVG страны.
                 let palette = paletteCache.get(c.code);
                 if (!palette) {
                     palette = await new Promise(resolve => {
@@ -3488,26 +3479,28 @@
                 if (!svgText) continue;
 
                 const rep = await repaintFlagSVG(c.code, palette, colors, realPalettes, svgText);
-                if (!rep) continue; // страна не подошла — пробуем следующую
+                if (!rep) continue; // страна не подошла — следующая
 
                 used.add(c.code);
-                deck.push({
+                fakeCards.push({
                     isReal: false, code: c.code,
                     url: rep.svgDataUrl, desc: rep.desc, fromHex: rep.fromHex, toHex: rep.toHex,
                 });
-                wantFake = !wantFake;
-                onProgress(deck.length, target);
-                await new Promise(r => setTimeout(r, 0));
+                onProgress(fakeCards.length + realCards.length, target);
+                await new Promise(r => setTimeout(r, 0)); // даём отрисоваться прогрессу
             }
 
-            // Если фейков не хватило (мало подходящих стран), добираем настоящими.
+            // Настоящие — из оставшихся стран.
             for (const c of shuffled) {
-                if (deck.length >= target) break;
+                if (fakeCards.length + realCards.length >= target) break;
                 if (used.has(c.code)) continue;
                 used.add(c.code);
-                deck.push({ isReal: true, code: c.code });
-                onProgress(deck.length, target);
+                realCards.push({ isReal: true, code: c.code });
+                onProgress(fakeCards.length + realCards.length, target);
             }
+
+            // Перемешиваем весь дек: фейки и настоящие идут в случайном порядке.
+            const deck = shuffleArray(fakeCards.concat(realCards));
             return deck;
         }
 
