@@ -157,6 +157,58 @@
             opacity: 0.8;
         }
 
+        /* Анаграмма — подсказка, а не режим показа флага: живёт отдельной строкой под верхней полосой
+           и не мешает ни Zoom, ни Цветам, ни Контуру. Скрыта, пока режим выключен. */
+        /* Анаграмма стоит ровно там, где был бы флаг: это и есть вопрос, а не подпись к нему. */
+        .anagram-hint {
+            display: none;
+            margin: 0 auto;
+            padding: 10px 18px;
+            border-radius: 14px;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-weight: 700;
+            font-size: 1.9rem;
+            line-height: 1.25;
+            letter-spacing: 0.2em;
+            text-align: center;
+            text-transform: uppercase;
+            width: fit-content;
+            max-width: min(340px, 86vw);
+            overflow-wrap: anywhere;
+        }
+        .anagram-hint.show {
+            display: block;
+        }
+
+        /* Счётчик кусков пазла: без него собранное состояние приходится угадывать по рамке. */
+        .puzzle-status {
+            display: none;
+            margin: 6px auto 0;
+            padding: 5px 14px;
+            border-radius: 30px;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-align: center;
+            width: fit-content;
+        }
+        .puzzle-status.show {
+            display: block;
+        }
+        .puzzle-status.solved {
+            background: #16a34a;
+            color: white;
+        }
+        @media (max-width: 600px) {
+            .anagram-hint {
+                font-size: 1.4rem;
+                letter-spacing: 0.14em;
+                padding: 8px 14px;
+            }
+        }
+
         .flag-area {
             position: absolute;
             left: 50%;
@@ -178,6 +230,11 @@
         }
         .flag-area canvas {
             width: 200px;
+        }
+        /* Пазл крупнее остальных canvas: по кускам надо попадать пальцем. */
+        .flag-area canvas.puzzle {
+            width: 320px;
+            cursor: pointer;
         }
         /* Фейковый флаг (canvas) показывается в размере настоящего img — иначе игрок
            отличал бы фейк по размеру. Инлайн-стиль width:320px в showFlagCanvas. */
@@ -455,7 +512,11 @@
             width: 300px;
             max-height: min(70vh, 520px);
             overflow-y: auto;
-            pointer-events: none;
+            /* Панель должна принимать мышь: иначе её нельзя ни прокрутить, ни навести — курсор уходит
+               с бейджа, и окошко закрывается ровно в момент, когда к нему тянешься. */
+            pointer-events: auto;
+            /* Докрутив список до конца, не прокручиваем страницу под ним. */
+            overscroll-behavior: contain;
             background: #fdfbf5;
             border: 2px solid rgba(197, 168, 110, 0.6);
             border-radius: 12px;
@@ -889,7 +950,17 @@
 </head>
 <body>
     <div id="changelogHover">
-        <div class="ver">1.3.0-beta — Новое</div>
+        <div class="ver">1.4.0-beta — Новое</div>
+        <ul>
+            <li>Режим «Пазл»: флаг нарезан сеткой 4×3 и перемешан, куски меняются местами по клику</li>
+            <li>Счётчик «кусков на месте» и явное «Флаг собран» — видно, что собрано верно</li>
+            <li>Собранный флаг засчитывается как «знаю» и сам уходит на следующий</li>
+            <li>Собранность определяется по картинке: одинаковые куски полосы взаимозаменяемы</li>
+            <li>Собранный флаг теряет сетку и получает зелёную рамку; ответить можно и не собрав</li>
+            <li>Режим «Анаграмма»: буквы названия перемешаны, флага при этом не видно</li>
+            <li>Границы слов в анаграмме сохранены; перемешивание детерминированное</li>
+        </ul>
+        <div class="ver">1.3.0-beta — Контур</div>
         <ul>
             <li>Режим «Контур»: угадываем страну по силуэту границ, без флага</li>
             <li>Контуры тянутся один раз при включении режима и кэшируются</li>
@@ -941,19 +1012,22 @@
                     <button id="togglePie" class="toggle-flags" title="Показывать только доли цветов флага">🥧 Цвета</button>
                     <button id="togglePieLabels" class="toggle-flags" title="Показывать проценты на пайчарте">#%</button>
                     <button id="toggleOutline" class="toggle-flags" title="Показывать только контур страны">🗺️ Контур</button>
+                    <button id="togglePuzzle" class="toggle-flags" title="Флаг нарезан на части, части перемешаны">🧩 Пазл</button>
+                    <button id="toggleAnagram" class="toggle-flags" title="Буквы названия страны перемешаны">🔤 Анаграмма</button>
                 </div>
             </div>
 
             <div class="flag-area">
-                <img id="flagImage" src="" alt="Флаг" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                <img id="flagImage" alt="Флаг" onerror="if (!this.getAttribute('src')) return; this.style.display='none'; this.nextElementSibling.style.display='block'">
                 <span style="display:none; color:#94a3b8; font-size:0.8rem;">нет флага</span>
                 <canvas id="flagZoom" style="display:none"></canvas>
                 <svg id="flagOutline" class="outline" style="display:none" viewBox="0 0 100 100" aria-label="Контур страны"><path d=""></path></svg>
+                <div class="anagram-hint" id="anagramHint"></div>
             </div>
 
             <div class="version-corner">
                 <span id="newVersionLabel" class="hidden">Новая версия</span>
-                <span id="versionBadge">v1.3.0-beta</span>
+                <span id="versionBadge">v1.4.0-beta</span>
             </div>
 
             <div class="right-actions">
@@ -963,6 +1037,8 @@
                 <button class="primary hidden" id="btnNext" data-key="Enter">➡️ Далее</button>
             </div>
         </div>
+
+        <div class="puzzle-status" id="puzzleStatus"></div>
 
         <div class="result-box" id="resultBox">
             <div class="msg" id="resultMsg">Правильно!</div>
@@ -1348,6 +1424,10 @@
         const togglePieBtn = document.getElementById('togglePie');
         const togglePieLabelsBtn = document.getElementById('togglePieLabels');
         const toggleOutlineBtn = document.getElementById('toggleOutline');
+        const togglePuzzleBtn = document.getElementById('togglePuzzle');
+        const toggleAnagramBtn = document.getElementById('toggleAnagram');
+        const anagramHint = document.getElementById('anagramHint');
+        const puzzleStatus = document.getElementById('puzzleStatus');
         const flagZoom = document.getElementById('flagZoom');
         const flagOutline = document.getElementById('flagOutline');
         const flagOutlinePath = flagOutline.querySelector('path');
@@ -1359,6 +1439,10 @@
         // Подписи процентов на пайчарте — отдельный тумблер, по умолчанию включены.
         let pieLabelsOn = true;
         let outlineOn = false;
+        let puzzleOn = false;
+        // Анаграмма — такой же режим показа, как Zoom или Контур, и живёт в том же стеке. Иначе она
+        // показывалась бы вместе с флагом, а это не загадка: буквы при видимом флаге бесполезны.
+        let anagramOn = false;
         // Порядок включения: последний в списке и показывается.
         let modeStack = [];
         const ZOOM_STORAGE_KEY = 'flagZoomLevel';
@@ -1366,7 +1450,315 @@
         const PIE_STORAGE_KEY = 'flagPieMode';
         const PIE_LABELS_STORAGE_KEY = 'flagPieLabels';
         const OUTLINE_STORAGE_KEY = 'flagOutlineMode';
+        const PUZZLE_STORAGE_KEY = 'flagPuzzleMode';
+        const ANAGRAM_STORAGE_KEY = 'flagAnagramMode';
         const MODE_STACK_STORAGE_KEY = 'flagModeStack';
+
+        // --------------------------------------------------------------
+        // Перемешивание. Оба новых режима обязаны быть ДЕТЕРМИНИРОВАННЫМИ: одна и та же страна всегда
+        // перемешивается одинаково. Иначе любой повторный рендер — нажали «Цвета» и вернулись, сменили
+        // размер окна — выдавал бы новую раскладку, и игрок видел бы, что картинка «дрожит», а главное:
+        // сложность раунда менялась бы под ним. Поэтому не Math.random, а xorshift, засеянный кодом
+        // страны.
+        function makeSeededRandom(seedText) {
+            let h = 2166136261 >>> 0;
+            for (let i = 0; i < seedText.length; i++) {
+                h = (h ^ seedText.charCodeAt(i)) >>> 0;
+                h = Math.imul(h, 16777619) >>> 0;
+            }
+
+            return () => {
+                h = (h ^ (h << 13)) >>> 0;
+                h = (h ^ (h >>> 17)) >>> 0;
+                h = (h ^ (h << 5)) >>> 0;
+                return h / 4294967296;
+            };
+        }
+
+        /// <summary>Перестановка индексов 0..n-1, гарантированно не совпадающая с исходной.</summary>
+        function scrambleOrder(n, seedText) {
+            const order = Array.from({ length: n }, (_, i) => i);
+            if (n < 2) return order;
+
+            const rnd = makeSeededRandom(seedText);
+            for (let i = n - 1; i > 0; i--) {
+                const j = Math.floor(rnd() * (i + 1));
+                [order[i], order[j]] = [order[j], order[i]];
+            }
+
+            // Тождественная перестановка — это «ничего не перемешали»: для короткого слова вроде «ЧАД»
+            // такое выпадает часто. Сдвиг на один гарантирует, что не осталось ни одного элемента на
+            // своём месте.
+            if (order.every((v, i) => v === i)) {
+                order.push(order.shift());
+            }
+
+            return order;
+        }
+
+        // --------------------------------------------------------------
+        // Режим «Пазл»: флаг нарезан сеткой и перемешан, куски надо расставить по местам. Клик по двум
+        // кускам меняет их местами — это работает и мышью, и пальцем, в отличие от перетаскивания.
+        //
+        // Собирать не обязательно: игрок в любой момент может назвать страну, и собранный флаг — просто
+        // способ до неё добраться. Поэтому пазл не блокирует ответ и не считается отдельной победой.
+        const PUZZLE_COLS = 4;
+        const PUZZLE_ROWS = 3;
+
+        // puzzleOrder[позиция] = номер куска, который на ней лежит. Собрано, когда каждый кусок на своём.
+        let puzzleOrder = null;
+        let puzzleSelected = null;
+        let puzzleSolved = false;
+        let puzzleImg = null;
+        let puzzleKey = null;
+        // Одна и та же страна возвращается в игру (интервальные повторы), и раздача должна быть новой:
+        // поэтому ключ раздачи — страна плюс номер вопроса, а не только страна.
+        let puzzleRound = 0;
+
+        // Собранный пазл закрывает раунд сам: страна идёт в «знаю», и дальше флаг меняется без клика.
+        // Два шага с паузами, а не один: без первой паузы игрок не успевает увидеть, что собрал, без
+        // второй — не успевает прочитать, что это была за страна. Оба шага зовут штатные функции, иначе
+        // мимо прошли бы и интервальные повторы, и счёт забега.
+        const PUZZLE_SOLVED_DELAY = 700;
+        const PUZZLE_RESULT_DELAY = 1300;
+        let puzzleAutoTimer = null;
+
+        function clearPuzzleAuto() {
+            if (puzzleAutoTimer !== null) {
+                clearTimeout(puzzleAutoTimer);
+                puzzleAutoTimer = null;
+            }
+        }
+
+        function scheduleAfterSolved() {
+            clearPuzzleAuto();
+            puzzleAutoTimer = setTimeout(() => {
+                puzzleAutoTimer = null;
+                // За время паузы игрок мог сам ответить, выключить режим или уйти в другой — тогда
+                // доигрывать за него нечего.
+                if (shownMode() !== 'puzzle' || !puzzleSolved || state.step !== 'country') {
+                    return;
+                }
+
+                if (speedActive) {
+                    speedOnKnow();
+                } else {
+                    onKnow();
+                }
+
+                puzzleAutoTimer = setTimeout(() => {
+                    puzzleAutoTimer = null;
+                    if (shownMode() !== 'puzzle' || state.step !== 'result') {
+                        return;
+                    }
+
+                    if (speedActive) {
+                        speedConfirmKnown();
+                    } else {
+                        nextQuestion();
+                    }
+                }, PUZZLE_RESULT_DELAY);
+            }, PUZZLE_SOLVED_DELAY);
+        }
+
+        function resetPuzzleForNewQuestion() {
+            clearPuzzleAuto();
+            puzzleRound++;
+            puzzleSelected = null;
+        }
+
+        // Сколько точек замеряем в каждом куске, и насколько они могут разойтись, чтобы куски всё ещё
+        // считались одинаковыми. Допуск нужен из-за уменьшения картинки: на границе цветов пиксели
+        // смешиваются, и два «одинаковых» куска никогда не совпадают байт в байт.
+        const PUZZLE_SAMPLES = 4;
+        const PUZZLE_TOLERANCE = 12;
+        const puzzleSignatureCache = new Map();
+        let puzzleSignatures = null;
+
+        /// <summary>Отпечаток каждого куска: сетка 4×4 цветовых замеров.</summary>
+        function computeTileSignatures(img) {
+            const W = PUZZLE_COLS * PUZZLE_SAMPLES;
+            const H = PUZZLE_ROWS * PUZZLE_SAMPLES;
+            const off = document.createElement('canvas');
+            off.width = W;
+            off.height = H;
+            const octx = off.getContext('2d', { willReadFrequently: true });
+            octx.drawImage(img, 0, 0, W, H);
+            const data = octx.getImageData(0, 0, W, H).data;
+
+            const signatures = [];
+            for (let r = 0; r < PUZZLE_ROWS; r++) {
+                for (let c = 0; c < PUZZLE_COLS; c++) {
+                    const sig = [];
+                    for (let sy = 0; sy < PUZZLE_SAMPLES; sy++) {
+                        for (let sx = 0; sx < PUZZLE_SAMPLES; sx++) {
+                            const px = (((r * PUZZLE_SAMPLES) + sy) * W + (c * PUZZLE_SAMPLES) + sx) * 4;
+                            sig.push(data[px], data[px + 1], data[px + 2]);
+                        }
+                    }
+
+                    signatures.push(sig);
+                }
+            }
+
+            return signatures;
+        }
+
+        function tilesLookSame(a, b) {
+            if (!a || !b) return false;
+
+            for (let i = 0; i < a.length; i++) {
+                if (Math.abs(a[i] - b[i]) > PUZZLE_TOLERANCE) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>Сколько кусков стоят правильно. Сравниваем КАРТИНКУ, а не номера: на флаге с
+        /// однотонной полосой два куска неотличимы, и если игрок поменял их местами, флаг собран —
+        /// хотя перестановка не тождественная. Сравнение по номерам объявляло бы такой флаг несобранным,
+        /// и игрок не понимал бы, чего от него ещё хотят.</summary>
+        function puzzleCorrectCount() {
+            if (!puzzleOrder) return 0;
+
+            let correct = 0;
+            for (let i = 0; i < puzzleOrder.length; i++) {
+                if (puzzleOrder[i] === i
+                    || (puzzleSignatures && tilesLookSame(puzzleSignatures[puzzleOrder[i]], puzzleSignatures[i]))) {
+                    correct++;
+                }
+            }
+
+            return correct;
+        }
+
+        function ensurePuzzleOrder(code) {
+            const key = `${code}:${puzzleRound}`;
+            if (puzzleKey === key && puzzleOrder) {
+                return;
+            }
+
+            puzzleKey = key;
+            puzzleOrder = scrambleOrder(PUZZLE_COLS * PUZZLE_ROWS, `puzzle:${key}`);
+            puzzleSelected = null;
+            puzzleSolved = false;
+        }
+
+        /// <summary>Готовит раздачу под конкретную картинку: считает отпечатки кусков и, если выпавшая
+        /// раскладка визуально уже собрана (бывает на флагах из широких одноцветных полос), пересдаёт.</summary>
+        function preparePuzzle(img, code) {
+            ensurePuzzleOrder(code);
+
+            if (!puzzleSignatureCache.has(code)) {
+                puzzleSignatureCache.set(code, computeTileSignatures(img));
+            }
+
+            puzzleSignatures = puzzleSignatureCache.get(code);
+
+            const total = PUZZLE_COLS * PUZZLE_ROWS;
+            for (let attempt = 1; attempt <= 20 && puzzleCorrectCount() === total; attempt++) {
+                puzzleOrder = scrambleOrder(total, `puzzle:${puzzleKey}:${attempt}`);
+            }
+
+            // Флаг из одного цвета пересдать невозможно: тогда он честно собран с первого показа —
+            // и раунд всё равно должен уехать дальше, иначе он завис бы на «собрано» без клика.
+            puzzleSolved = puzzleCorrectCount() === total;
+            if (puzzleSolved) {
+                scheduleAfterSolved();
+            }
+        }
+
+        /// <summary>Счётчик кусков — прямой ответ на «а я правильно собрал?».</summary>
+        function renderPuzzleStatus() {
+            const show = shownMode() === 'puzzle' && !fakeActive && !!state.currentCountry
+                && state.step !== 'result' && !!puzzleOrder;
+            puzzleStatus.classList.toggle('show', show);
+            puzzleStatus.classList.toggle('solved', show && puzzleSolved);
+
+            if (!show) {
+                puzzleStatus.textContent = '';
+                return;
+            }
+
+            const total = PUZZLE_COLS * PUZZLE_ROWS;
+            puzzleStatus.textContent = puzzleSolved
+                ? '✅ Флаг собран — засчитано, дальше сам'
+                : `Кусков на месте: ${puzzleCorrectCount()} / ${total}`;
+        }
+
+        /// <summary>Подписи под флагом: анаграмма и счётчик пазла. Вызывается из всех точек, где
+        /// меняется вопрос или режим.</summary>
+        function renderModeNotes() {
+            renderAnagramHint();
+            renderPuzzleStatus();
+        }
+
+        /// <summary>Какой кусок под курсором. null — промах по краю.</summary>
+        function puzzlePosAt(clientX, clientY) {
+            const rect = flagZoom.getBoundingClientRect();
+            if (!rect.width || !rect.height) return null;
+
+            const col = Math.floor((clientX - rect.left) / (rect.width / PUZZLE_COLS));
+            const row = Math.floor((clientY - rect.top) / (rect.height / PUZZLE_ROWS));
+            if (col < 0 || col >= PUZZLE_COLS || row < 0 || row >= PUZZLE_ROWS) {
+                return null;
+            }
+
+            return row * PUZZLE_COLS + col;
+        }
+
+        function onPuzzleClick(event) {
+            if (shownMode() !== 'puzzle' || puzzleSolved || !puzzleOrder || !puzzleImg) {
+                return;
+            }
+
+            // На результате флаг уже показан целиком — переставлять нечего.
+            if (state.step === 'result') {
+                return;
+            }
+
+            // Раздача принадлежит предыдущему вопросу: новый флаг ещё летит из сети, и перерисовка
+            // показала бы старую картинку под новой раскладкой.
+            if (!state.currentCountry || puzzleKey !== `${state.currentCountry.code}:${puzzleRound}`) {
+                return;
+            }
+
+            const pos = puzzlePosAt(event.clientX, event.clientY);
+            if (pos === null) return;
+
+            if (puzzleSelected === null) {
+                puzzleSelected = pos;
+            } else if (puzzleSelected === pos) {
+                puzzleSelected = null;
+            } else {
+                const tmp = puzzleOrder[puzzleSelected];
+                puzzleOrder[puzzleSelected] = puzzleOrder[pos];
+                puzzleOrder[pos] = tmp;
+                puzzleSelected = null;
+                puzzleSolved = puzzleCorrectCount() === PUZZLE_COLS * PUZZLE_ROWS;
+                if (puzzleSolved) {
+                    scheduleAfterSolved();
+                }
+            }
+
+            drawPuzzle(puzzleImg);
+            renderPuzzleStatus();
+        }
+
+        /// <summary>Перемешанные буквы названия. Границы слов сохраняются: они и так видны по длине,
+        /// а слитная каша из «Босния и Герцеговина» превращает задачу в упражнение по печати.</summary>
+        function anagramOf(name, seedText) {
+            return name.split(/([\s-]+)/).map(part => {
+                if (part.length < 2 || /^[\s-]+$/.test(part)) {
+                    return part;
+                }
+
+                const letters = [...part];
+                return scrambleOrder(letters.length, `${seedText}:${part}`).map(i => letters[i]).join('');
+            }).join('');
+        }
 
         // --------------------------------------------------------------
         // Режим «Контур»: вместо флага — силуэт страны по государственным границам.
@@ -1828,6 +2220,101 @@
             ctx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, outW, outH);
         }
 
+        /// <summary>Рисует текущую раскладку пазла: куски на своих позициях, выбранный подсвечен,
+        /// собранный флаг — без сетки и с зелёной рамкой.</summary>
+        function drawPuzzle(img) {
+            const outW = 640;
+            const outH = Math.round(outW * img.naturalHeight / img.naturalWidth) || Math.round(outW * 2 / 3);
+            flagZoom.classList.remove('pie');
+            flagZoom.classList.add('puzzle');
+            flagZoom.width = outW;
+            flagZoom.height = outH;
+            const ctx = flagZoom.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.clearRect(0, 0, outW, outH);
+
+            // Границы считаем целыми числами и берём соседние: при дробной ширине плитки между кусками
+            // оставались бы волосяные щели с фоном.
+            const edge = (i, count, total) => Math.round(i * total / count);
+            const cells = [];
+            for (let r = 0; r < PUZZLE_ROWS; r++) {
+                for (let c = 0; c < PUZZLE_COLS; c++) {
+                    cells.push({ r, c });
+                }
+            }
+
+            cells.forEach((dst, i) => {
+                const src = cells[puzzleOrder[i]];
+                const sx = edge(src.c, PUZZLE_COLS, img.naturalWidth);
+                const sy = edge(src.r, PUZZLE_ROWS, img.naturalHeight);
+                const dx = edge(dst.c, PUZZLE_COLS, outW);
+                const dy = edge(dst.r, PUZZLE_ROWS, outH);
+                ctx.drawImage(
+                    img,
+                    sx, sy,
+                    edge(src.c + 1, PUZZLE_COLS, img.naturalWidth) - sx,
+                    edge(src.r + 1, PUZZLE_ROWS, img.naturalHeight) - sy,
+                    dx, dy,
+                    edge(dst.c + 1, PUZZLE_COLS, outW) - dx,
+                    edge(dst.r + 1, PUZZLE_ROWS, outH) - dy
+                );
+            });
+
+            // Сетка по стыкам: без неё однотонные флаги выглядят просто как флаг, и непонятно, что
+            // картинку вообще перемешали. На собранном флаге сетка уходит — это и есть награда.
+            if (!puzzleSolved) {
+                ctx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+                ctx.lineWidth = 2;
+                for (let c = 1; c < PUZZLE_COLS; c++) {
+                    const x = edge(c, PUZZLE_COLS, outW);
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, outH);
+                    ctx.stroke();
+                }
+
+                for (let r = 1; r < PUZZLE_ROWS; r++) {
+                    const y = edge(r, PUZZLE_ROWS, outH);
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(outW, y);
+                    ctx.stroke();
+                }
+            }
+
+            if (puzzleSelected !== null) {
+                const sel = cells[puzzleSelected];
+                const x = edge(sel.c, PUZZLE_COLS, outW);
+                const y = edge(sel.r, PUZZLE_ROWS, outH);
+                const w = edge(sel.c + 1, PUZZLE_COLS, outW) - x;
+                const h = edge(sel.r + 1, PUZZLE_ROWS, outH) - y;
+                // Затемнение плюс рамка: на светлых флагах одна рамка почти не видна, на тёмных —
+                // наоборот, поэтому нужны оба признака.
+                ctx.fillStyle = 'rgba(30, 41, 59, 0.3)';
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 6;
+                ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+            }
+
+            if (puzzleSolved) {
+                ctx.strokeStyle = '#16a34a';
+                ctx.lineWidth = 8;
+                ctx.strokeRect(4, 4, outW - 8, outH - 8);
+            }
+        }
+
+        /// <summary>Строка с перемешанными буквами — сам вопрос в режиме «Анаграмма». Показывается
+        /// только когда этот режим наверху стека: при видимом флаге буквы ничего не загадывают. На
+        /// экране результата не нужна — там уже написано настоящее название.</summary>
+        function renderAnagramHint() {
+            const country = state.currentCountry;
+            const show = shownMode() === 'anagram' && !fakeActive && !!country && state.step !== 'result';
+            anagramHint.classList.toggle('show', show);
+            anagramHint.textContent = show ? anagramOf(country.name, `anagram:${country.code}`) : '';
+        }
+
         /// <summary>Показывает силуэт страны: путь из карты, рамка — по его же границам.</summary>
         function showOutline(code) {
             const token = ++outlineLoadToken;
@@ -1873,6 +2360,12 @@
         function showFlag(code, full = false) {
             zoomLoadToken++;
             flagImg.nextElementSibling.style.display = 'none';
+            // Класс пазла снимаем на входе: его ставит обратно только сам пазл, иначе он утащил бы
+            // свой размер и курсор-палец в Zoom и Цвета.
+            flagZoom.classList.remove('puzzle');
+            // Подсказку пересобираем здесь: это единственная точка, через которую проходит и обычный
+            // режим, и забег. Шаг к этому моменту уже выставлен, так что на результате она скроется сама.
+            renderModeNotes();
             const mode = shownMode();
             if (mode === 'flag' || full) {
                 outlineLoadToken++;
@@ -1888,6 +2381,18 @@
 
             if (mode === 'outline') {
                 showOutline(code);
+                return;
+            }
+
+            // Анаграмма: флага нет вообще, вопрос — сама строка букв.
+            if (mode === 'anagram') {
+                outlineLoadToken++;
+                flagOutline.style.display = 'none';
+                flagZoom.style.display = 'none';
+                flagImg.style.display = 'none';
+                // Подпись «нет флага» относится к сбою загрузки. Здесь картинки нет по замыслу,
+                // и сообщать об этом не надо.
+                flagImg.nextElementSibling.style.display = 'none';
                 return;
             }
 
@@ -1914,6 +2419,16 @@
                         return;
                     }
 
+                    if (mode === 'puzzle') {
+                        // Держим картинку: каждая перестановка перерисовывает canvas, и ходить за
+                        // флагом в сеть на каждый клик было бы и медленно, и зря.
+                        puzzleImg = img;
+                        preparePuzzle(img, code);
+                        drawPuzzle(img);
+                        renderPuzzleStatus();
+                        return;
+                    }
+
                     const cacheKey = `${code}:${zoomLevel}`;
                     let crop = zoomCropCache.get(cacheKey);
                     if (!crop) {
@@ -1934,7 +2449,7 @@
         }
 
         function revealFlag() {
-            if ((zoomOn || pieOn || outlineOn) && state.currentCountry) {
+            if ((zoomOn || pieOn || outlineOn || puzzleOn || anagramOn) && state.currentCountry) {
                 showFlag(state.currentCountry.code, true);
             }
         }
@@ -1960,6 +2475,12 @@
 
             toggleOutlineBtn.classList.toggle('active', shown === 'outline');
             toggleOutlineBtn.classList.toggle('armed', outlineOn && shown !== 'outline');
+
+            togglePuzzleBtn.classList.toggle('active', shown === 'puzzle');
+            togglePuzzleBtn.classList.toggle('armed', puzzleOn && shown !== 'puzzle');
+
+            toggleAnagramBtn.classList.toggle('active', shown === 'anagram');
+            toggleAnagramBtn.classList.toggle('armed', anagramOn && shown !== 'anagram');
         }
 
         // Проценты на пае — отдельный тумблер: касается и главного пая, и карточки наведения.
@@ -1976,7 +2497,9 @@
         function shownMode() {
             for (let i = modeStack.length - 1; i >= 0; i--) {
                 const mode = modeStack[i];
-                if ((mode === 'zoom' && zoomOn) || (mode === 'pie' && pieOn) || (mode === 'outline' && outlineOn)) {
+                if ((mode === 'zoom' && zoomOn) || (mode === 'pie' && pieOn)
+                    || (mode === 'outline' && outlineOn) || (mode === 'puzzle' && puzzleOn)
+                    || (mode === 'anagram' && anagramOn)) {
                     return mode;
                 }
             }
@@ -2033,9 +2556,29 @@
             applyModeChange();
         }
 
+        function togglePuzzle() {
+            puzzleOn = !puzzleOn;
+            if (puzzleOn) {
+                raiseMode('puzzle');
+            }
+
+            applyModeChange();
+        }
+
+        function toggleAnagram() {
+            anagramOn = !anagramOn;
+            if (anagramOn) {
+                raiseMode('anagram');
+            }
+
+            applyModeChange();
+        }
+
         function applyModeChange() {
+            clearPuzzleAuto();
             renderModeButtons();
             persistDisplayMode();
+            renderModeNotes();
 
             if (state.currentCountry) {
                 showFlag(state.currentCountry.code, state.step === 'result');
@@ -2066,6 +2609,8 @@
                 localStorage.setItem(PIE_STORAGE_KEY, pieOn ? '1' : '0');
                 localStorage.setItem(PIE_LABELS_STORAGE_KEY, pieLabelsOn ? '1' : '0');
                 localStorage.setItem(OUTLINE_STORAGE_KEY, outlineOn ? '1' : '0');
+                localStorage.setItem(PUZZLE_STORAGE_KEY, puzzleOn ? '1' : '0');
+                localStorage.setItem(ANAGRAM_STORAGE_KEY, anagramOn ? '1' : '0');
                 localStorage.setItem(MODE_STACK_STORAGE_KEY, modeStack.join(','));
             } catch (e) {
                 // приватный режим — просто не запоминаем
@@ -2237,7 +2782,7 @@
         const versionBadge = document.getElementById('versionBadge');
         const changelogHover = document.getElementById('changelogHover');
         const newVersionLabel = document.getElementById('newVersionLabel');
-        const APP_VERSION = '1.3.0-beta';
+        const APP_VERSION = '1.4.0-beta';
         const SEEN_VERSION_KEY = 'seenVersion';
 
         try {
@@ -2249,8 +2794,22 @@
         }
 
         let seenTimer = null;
+        // Между бейджем и панелью зазор 8px, и курсор его пересекает. Без паузы на перелёт панель
+        // закрывается прямо под курсором, и до списка не добраться.
+        let hideHoverTimer = null;
+
+        function scheduleHideChangelog() {
+            clearTimeout(hideHoverTimer);
+            hideHoverTimer = setTimeout(hideChangelogHover, 180);
+        }
+
+        function cancelHideChangelog() {
+            clearTimeout(hideHoverTimer);
+            hideHoverTimer = null;
+        }
 
         versionBadge.addEventListener('mouseenter', () => {
+            cancelHideChangelog();
             // Окошко чейнжлога пристыковываем под бейджем, где бы тот ни стоял,
             // и не даём ему вылезти за края окна.
             const r = versionBadge.getBoundingClientRect();
@@ -2258,6 +2817,11 @@
             changelogHover.style.right = 'auto';
             changelogHover.style.left = 'auto';
             changelogHover.style.display = 'block';
+            // Высоту подрезаем по месту ПОД бейджем, а не по 70vh от всего окна. Иначе низ панели
+            // уезжает за край окна, и внутренняя прокрутка его не достаёт: прокручивается содержимое
+            // внутри блока, а сам блок обрезан вьюпортом. Чем длиннее чейнжлог, тем заметнее.
+            const available = window.innerHeight - r.bottom - 24;
+            changelogHover.style.maxHeight = `${Math.max(160, Math.min(520, available))}px`;
             let right = window.innerWidth - r.right;
             const w = changelogHover.offsetWidth;
             if (r.right - w < 8) {
@@ -2275,16 +2839,22 @@
         });
         versionBadge.addEventListener('mouseleave', () => {
             clearTimeout(seenTimer);
-            hideChangelogHover();
+            scheduleHideChangelog();
         });
 
+        // Курсор на самой панели — значит её читают: закрытие отменяем, пока он не уйдёт.
+        changelogHover.addEventListener('mouseenter', cancelHideChangelog);
+        changelogHover.addEventListener('mouseleave', scheduleHideChangelog);
+
         function hideChangelogHover() {
+            cancelHideChangelog();
             changelogHover.style.display = 'none';
         }
 
         function renderCountryStep() {
             state.step = 'country';
             state.selectedCountry = null;
+            resetPuzzleForNewQuestion();
 
             showFlag(state.currentCountry.code);
 
@@ -2364,6 +2934,8 @@
             const correctCapital = country.capital;
             const correctName = country.name;
 
+            // revealFlag молчит, когда ни один режим показа не включён, — а подсказку убрать надо всегда.
+            renderModeNotes();
             revealFlag();
             clearOptions();
             btnKnow.classList.add('hidden');
@@ -2513,6 +3085,7 @@
         }
 
         function exitSpeedMode(showResults) {
+            clearPuzzleAuto();
             if (!speedActive) return;
             speedActive = false;
             speedStopTimer();
@@ -2593,6 +3166,7 @@
             btnMistake.classList.add('hidden');
             btnNext.classList.add('hidden');
             resultBox.classList.remove('show', 'correct', 'wrong', 'skip', 'dontknow');
+            resetPuzzleForNewQuestion();
             showFlag(country.code);
             renderSpeedCountryOptions();
         }
@@ -2633,6 +3207,7 @@
         function speedShowResult(type, selectedName) {
             state.step = 'result';
             const country = state.currentCountry;
+            renderModeNotes();
             revealFlag();
 
             // Копим время, потраченное на эту страну (по всем кругам)
@@ -3002,6 +3577,9 @@
             togglePieBtn.addEventListener('click', togglePie);
             togglePieLabelsBtn.addEventListener('click', togglePieLabels);
             toggleOutlineBtn.addEventListener('click', toggleOutline);
+            togglePuzzleBtn.addEventListener('click', togglePuzzle);
+            flagZoom.addEventListener('click', onPuzzleClick);
+            toggleAnagramBtn.addEventListener('click', toggleAnagram);
 
             try {
                 const savedLevel = localStorage.getItem(ZOOM_STORAGE_KEY);
@@ -3013,9 +3591,11 @@
                 pieOn = localStorage.getItem(PIE_STORAGE_KEY) === '1';
                 pieLabelsOn = localStorage.getItem(PIE_LABELS_STORAGE_KEY) !== '0';
                 outlineOn = localStorage.getItem(OUTLINE_STORAGE_KEY) === '1';
+                puzzleOn = localStorage.getItem(PUZZLE_STORAGE_KEY) === '1';
+                anagramOn = localStorage.getItem(ANAGRAM_STORAGE_KEY) === '1';
                 modeStack = (localStorage.getItem(MODE_STACK_STORAGE_KEY) ?? '')
                     .split(',')
-                    .filter(m => m === 'zoom' || m === 'pie' || m === 'outline');
+                    .filter(m => m === 'zoom' || m === 'pie' || m === 'outline' || m === 'puzzle' || m === 'anagram');
             } catch (e) {
                 // приватный режим — остаёмся на значениях по умолчанию
             }
@@ -3032,6 +3612,14 @@
 
             if (outlineOn && !modeStack.includes('outline')) {
                 modeStack.push('outline');
+            }
+
+            if (puzzleOn && !modeStack.includes('puzzle')) {
+                modeStack.push('puzzle');
+            }
+
+            if (anagramOn && !modeStack.includes('anagram')) {
+                modeStack.push('anagram');
             }
 
             if (outlineOn) {
@@ -3662,6 +4250,9 @@
         async function fakeStartMode() {
             if (fakeActive) return;
             fakeActive = true;
+            clearPuzzleAuto();
+            // У фейкового флага нет страны, значит и анаграмме неоткуда взяться.
+            renderModeNotes();
             fakeRound = 0;
             fakeScore = 0;
             fakeErrors = 0;
